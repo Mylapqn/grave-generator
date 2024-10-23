@@ -5,6 +5,9 @@ import { Vertex } from "./vertex";
 import { Earcut } from "three/src/extras/Earcut.js";
 
 export class Face {
+    public static selected?:Face;
+    public static hovered?:Face;
+
     public vertices: Vertex[];
     public edges: HalfEdge[];
     public mesh: PolyMesh;

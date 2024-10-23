@@ -1,11 +1,13 @@
 import { Line2, LineGeometry, LineMaterial } from 'three/examples/jsm/Addons.js';
 import './style.css'
-import { CatmullRomCurve3, ExtrudeGeometry, FrontSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, PCFSoftShadowMap, PerspectiveCamera, PointLight, Raycaster, Scene, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
+import { BoxGeometry, CatmullRomCurve3, DirectionalLight, ExtrudeGeometry, FrontSide, Group, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, PCFSoftShadowMap, PerspectiveCamera, PointLight, Raycaster, Scene, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
 import { Input, MouseButton } from './input';
 import { lerp } from 'three/src/math/MathUtils.js';
 import { PolyMesh } from './polymesh/polyMesh';
+import { EditingModes } from "./polymesh/editing";
 import { Face } from './polymesh/face';
 import { Vertex } from './polymesh/vertex';
+import { PolyObject } from './polymesh/object';
 
 const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true })
 const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight);
@@ -17,8 +19,36 @@ async function init() {
     Input.init();
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = PCFSoftShadowMap
+    renderer.autoClear = false;
     const scene = new Scene();
     const material = new MeshStandardMaterial({ color: 0x44AA88 });
+
+    const gizmo = new Group();
+    const moveGizmo = new Group();
+    const rotateGizmo = new Group();
+    const scaleGizmo = new Group();
+    gizmo.add(moveGizmo);
+    gizmo.add(rotateGizmo);
+    gizmo.add(scaleGizmo);
+
+    const gizmoThickness = 0.04;
+
+    const gizmoLength = 0.2;
+
+    const xMove = new Mesh(new BoxGeometry(gizmoLength, gizmoThickness, gizmoThickness), new MeshBasicMaterial({ color: 0xff0000 }));
+    xMove.position.x = gizmoLength / 2;
+
+    const yMove = new Mesh(new BoxGeometry(gizmoThickness, gizmoLength, gizmoThickness), new MeshBasicMaterial({ color: 0x00ff00 }));
+    yMove.position.y = gizmoLength / 2;
+
+    const zMove = new Mesh(new BoxGeometry(gizmoThickness, gizmoThickness, gizmoLength), new MeshBasicMaterial({ color: 0x0000ff }));
+    zMove.position.z = gizmoLength / 2;
+
+    moveGizmo.add(xMove);
+    moveGizmo.add(yMove);
+    moveGizmo.add(zMove);
+
+
     const group = new Group();
     scene.add(group);
 
@@ -52,7 +82,11 @@ async function init() {
 
     camera.position.z = 5;
     camera.position.y = 3;
-    camera.lookAt(new Vector3(0, 1, 0));
+    camera.lookAt(new Vector3(0, 0, 0));
+
+    const cameraParent = new Group();
+    cameraParent.add(camera);
+    scene.add(cameraParent);
 
     //scene.background = new Color(100,0,0);
 
@@ -74,124 +108,193 @@ async function init() {
 
     scene.add(light);
 
-    const light2 = new PointLight(0xFFFFFF, 3);
+    const light2 = new DirectionalLight(0xFFFFFF, .3);
 
-    light2.position.set(-3, -1, 0);
-    scene.add(light2);
+    light2.position.set(-3, -1, 1);
+    cameraParent.add(light2);
 
-    const pMesh = new PolyMesh();
-    Face.fromPoints(pMesh, [
-        new Vector3(1 - .5, 0, .25 * 3 - .5),
-        new Vector3(1 - .5, 0, .25 - .5),
-        new Vector3(.5 - .5, 0, 0 - .5),
-        new Vector3(0 - .5, 0, .25 - .5),
-        new Vector3(0 - .5, 0, .25 * 3 - .5),
-        new Vector3(.5 - .5, 0, 1 - .5),
-    ])
-    const polyGeometry = pMesh.triangulate();
-    const polyGeoMesh = new Mesh(polyGeometry, new MeshStandardMaterial({ color: 0x44AA88, side: FrontSide, wireframe: false, flatShading: true }));
-    polyGeoMesh.castShadow = true;
-    polyGeoMesh.receiveShadow = true;
-    group.add(polyGeoMesh);
+    const light3 = new DirectionalLight(0xFFFFFF, .2);
+
+    light3.position.set(3, 3, 3);
+    cameraParent.add(light3);
+
+    const obj = new PolyObject();
+    group.add(obj);
     //group.add(wireframe);
-    console.log(pMesh);
-    console.log(polyGeometry);
+
+    scene.add(new Line2(new LineGeometry().setPositions([-100, 0, 0, 100, 0, 0]), new LineMaterial({ color: 0x990000, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([0, -100, 0, 0, 100, 0]), new LineMaterial({ color: 0x000099, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([0, 0, -100, 0, 0, 100]), new LineMaterial({ color: 0x009900, linewidth: 2 })));
 
     window.requestAnimationFrame(update);
 
-    let rotVelocity = 0;
+    let rotVelocity = new Vector3(0, 0, 0);
     let hoverPoint = new Mesh(new SphereGeometry(.03), new MeshBasicMaterial());
-    let selectedFace: Line2 | null;
-    let selectedOgFace: Face;
+    let faceSelectionOutline: Line2 | null;
     let currentExtrudedFace: Face;
     let extruding = false;
     let extrudeDistance = 0;
     let extrudingDirection: Vector2;
     scene.add(hoverPoint);
-    let selectedVertex: Vertex;
+    let hoveredVertex: Vertex;
     let editingVerts = false;
+    let editingMode: EditingModes = EditingModes.Object;
+
+    const statsDiv = document.getElementById("stats") as HTMLDivElement;
+    let stats = "";
+    let fov = camera.fov;
+    let targetFov = fov;
     function update() {
         if (Input.mouse.movedThisFrame()) {
             raycaster.setFromCamera(Input.mouse.position.clone().divide({ x: window.innerWidth / 2, y: -window.innerHeight / 2 }).add({ x: -1, y: 1 }), camera);
-            const intersects = raycaster.intersectObjects([polyGeoMesh]);
-            if (selectedFace) {
-                selectedFace.removeFromParent();
-                selectedFace.geometry.dispose();
-                selectedFace = null;
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (faceSelectionOutline) {
+                faceSelectionOutline.removeFromParent();
+                faceSelectionOutline.geometry.dispose();
+                faceSelectionOutline = null;
             }
-            if (intersects.length > 0 || extruding) {
-                if (extruding) selectedOgFace = currentExtrudedFace;
-                else {
-                    if (editingVerts)
-                        selectedVertex = pMesh.getNearestPoint(polyGeoMesh.worldToLocal(intersects[0].point.clone()));
-                    selectedOgFace = pMesh.getNearestFace(polyGeoMesh.worldToLocal(intersects[0].point.clone()));
-                }
-                if (!editingVerts) {
-                    const positionsArrays = selectedOgFace.vertices.map(v => v.position.clone().addScaledVector(selectedOgFace.normal, -0.01).toArray());
-                    positionsArrays.push(positionsArrays[0], positionsArrays[1], positionsArrays[2]);
-                    const lineGeometry = new LineGeometry().setPositions(positionsArrays.flat());
+            if (extruding) Face.hovered = currentExtrudedFace;
+            else if (intersects.length > 0) {
 
-                    selectedFace = new Line2(lineGeometry, new LineMaterial({ color: 0xffff44, linewidth: 3 }));
-                    group.add(selectedFace);
+                if (editingMode == EditingModes.Object) {
+                    if (intersects[0].object && intersects[0].object.parent && intersects[0].object.parent instanceof PolyObject) {
+                        PolyObject.hover(intersects[0].object.parent);
+                    }
                 }
-            }
-        }
-        if (selectedVertex) {
-            hoverPoint.position.copy(polyGeoMesh.localToWorld(selectedVertex.position.clone()));
-        }
-        if (Input.mouse.getButton(MouseButton.Left)) {
-            if (selectedFace && !extruding && !editingVerts) {
-                extruding = true;
-                extrudeDistance = 0;
-                currentExtrudedFace = selectedOgFace.extrude(-.01).top;
-                const screenSpaceCenter = worldToScreen(polyGeoMesh.localToWorld(currentExtrudedFace.center.clone()));
-                const screenSpaceNormalTarget = worldToScreen(polyGeoMesh.localToWorld(currentExtrudedFace.center.clone().add(currentExtrudedFace.normal)));
-                extrudingDirection = screenSpaceNormalTarget.clone().sub(screenSpaceCenter).normalize();
-            }
-            else if (selectedVertex && editingVerts && !extruding) {
-                extruding = true;
-            }
-        }
-        else {
-            extruding = false;
-        }
-        if (extruding) {
-            if (!editingVerts) {
-                const scale = Input.mouse.delta.dot(extrudingDirection);
-                extrudeDistance += scale;
-                for (const v of currentExtrudedFace.vertices) {
-                    v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
+                else if (PolyObject.selected) {
+                    Face.hovered = PolyObject.selected.polyMesh.raycastFace(intersects[0]);
+                    Vertex.hovered = PolyObject.selected.polyMesh.getNearestPointOfFace(PolyObject.selected.worldToLocal(intersects[0].point), Face.hovered);
+                    switch (editingMode) {
+                        case EditingModes.Face: {
+                            if (Input.mouse.getButton(MouseButton.Left)) {
+                                Face.selected = Face.hovered;
+                            }
+                            const positionsArrays = Face.hovered.vertices.map(v => v.position.clone().addScaledVector(Face.hovered!.normal, -0.01).toArray());
+                            positionsArrays.push(positionsArrays[0], positionsArrays[1], positionsArrays[2]);
+                            const lineGeometry = new LineGeometry().setPositions(positionsArrays.flat());
+
+                            faceSelectionOutline = new Line2(lineGeometry, new LineMaterial({ color: 0xffff44, linewidth: 3 }));
+                            PolyObject.selected.add(faceSelectionOutline);
+                            break;
+                        }
+                        case EditingModes.Vertex: {
+                            if (Input.mouse.getButton(MouseButton.Left)) {
+                                Vertex.selected = Vertex.hovered;
+                            }
+                            hoverPoint.position.copy(Vertex.hovered.position);
+                            break;
+                        }
+
+                    }
                 }
             }
             else {
-                selectedVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
+                PolyObject.hover();
+                Face.hovered = undefined;
+                Vertex.hovered = undefined;
             }
-            for (const f of pMesh.faces) {
-                f.calculateCenter();
-            }
-            polyGeoMesh.geometry = pMesh.triangulate();
         }
-        if (Input.mouse.getButton(MouseButton.Right)) {
-            rotVelocity = (Input.mouse.delta.x * 0.01);
+        if (Input.mouse.getButton(MouseButton.Left)) {
+            switch (editingMode) {
+                case EditingModes.Object: {
+                    PolyObject.select(PolyObject.hovered);
+                    break;
+                }
+                case EditingModes.Vertex: {
+                    Vertex.selected = Vertex.hovered;
+                    break;
+                }
+                case EditingModes.Face: {
+                    Face.selected = Face.hovered;
+                    break;
+                }
+            }
+
+        }
+        stats += "Editing mode: " + ["Vertex", "Edge", "Face", "Object"][editingMode] + "\n";
+        stats += "Selected Object: " + PolyObject.selected?.name + "\n";
+        stats += "Hovered object: " + PolyObject.hovered?.name + "\n";
+
+        if (hoveredVertex) {
+            //hoverPoint.position.copy(polyGeoMesh.localToWorld(hoveredVertex.position.clone()));
+        }
+        /*         if (Input.mouse.getButton(MouseButton.Left)) {
+                    if (faceSelectionOutline && !extruding && !editingVerts) {
+                        extruding = true;
+                        extrudeDistance = 0;
+                        currentExtrudedFace = hoveredFace.extrude(-.01).top;
+                        const screenSpaceCenter = worldToScreen(polyGeoMesh.localToWorld(currentExtrudedFace.center.clone()));
+                        const screenSpaceNormalTarget = worldToScreen(polyGeoMesh.localToWorld(currentExtrudedFace.center.clone().add(currentExtrudedFace.normal)));
+                        extrudingDirection = screenSpaceNormalTarget.clone().sub(screenSpaceCenter).normalize();
+                    }
+                    else if (hoveredVertex && editingVerts && !extruding) {
+                        extruding = true;
+                    }
+                }
+                else {
+                    extruding = false;
+                }
+         *//*         if (extruding) {
+          if (!editingVerts) {
+              const scale = Input.mouse.delta.dot(extrudingDirection);
+              extrudeDistance += scale;
+              for (const v of currentExtrudedFace.vertices) {
+                  v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
+              }
+          }
+          else {
+              hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
+          }
+          for (const f of pMesh.faces) {
+              f.calculateCenter();
+          }
+          polyGeoMesh.geometry = pMesh.triangulate();
+      } */
+        if (Input.mouse.getButton(MouseButton.Wheel)) {
+            rotVelocity.x = (Input.mouse.delta.x * 0.003);
+            rotVelocity.z = (Input.mouse.delta.y * 0.003);
         }
         else {
-            rotVelocity = lerp(rotVelocity, 0.003, 0.05);
+            rotVelocity.x = lerp(rotVelocity.x, 0.00, 0.3);
+            rotVelocity.z = lerp(rotVelocity.z, 0.00, 0.3);
         }
-        if (Input.getKey("q")) {
-            editingVerts = true;
+        if (Input.getKeyUp("q")) {
+            editingMode = EditingModes.Vertex;
         }
-        if (Input.getKey("w")) {
-            editingVerts = false;
+        if (Input.getKeyUp("w")) {
+            editingMode = EditingModes.Edge;
         }
-        group.rotateY(rotVelocity);
+        if (Input.getKeyUp("w")) {
+            editingMode = EditingModes.Face;
+        }
+        if (Input.getKeyUp("Tab")) {
+            editingMode = editingMode == EditingModes.Object && PolyObject.selected ? EditingModes.Face : EditingModes.Object;
+        }
+
+        targetFov += Input.mouse.getScroll()*targetFov*.1;
+        targetFov = Math.max(10, Math.min(100, targetFov));
+        fov = lerp(fov, targetFov, 0.1);
+
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+
+        cameraParent.rotateOnWorldAxis(new Vector3(0, 1, 0), -rotVelocity.x);
+        cameraParent.rotateX(-rotVelocity.z * 0.5);
         //removeText(group);
         //group.add(createText((Math.random() + 1).toString(36).substring(7) + "0", font, material));
         renderer.render(scene, camera);
+        if (PolyObject.selected) {
+            renderer.clearDepth();
+            renderer.render(gizmo, camera);
+        }
 
-        Input.mouse.update();
+        statsDiv.innerText = stats;
+        stats = "";
+        Input.update();
         window.requestAnimationFrame(update);
     }
 }
+
 
 function worldToScreen(v: Vector3) {
     const projected = v.project(camera);
@@ -222,7 +325,7 @@ function worldToScreen(v: Vector3) {
     text.receiveShadow = true;
     return text;
 }
-
+ 
 function removeText(group: Group) {
     const text = group.getObjectByName("text") as Mesh;
     text?.removeFromParent();

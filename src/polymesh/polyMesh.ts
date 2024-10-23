@@ -1,18 +1,23 @@
 import { HalfEdge } from "./halfEdge";
 import { Face } from "./face";
 import { Vertex } from "./vertex";
-import { BufferGeometry, Float32BufferAttribute, Vector3 } from "three";
+import { BufferGeometry, Float32BufferAttribute, Intersection, Vector3 } from "three";
+import { PolyObject } from "./object";
 
 export type VertTriangle = [Vertex, Vertex, Vertex];
 
 export class PolyMesh {
+    public static selected:PolyMesh;
+    public static hovered:PolyMesh;
     public vertices: Vertex[];
     public faces: Face[];
     public edges: HalfEdge[];
-    constructor() {
+    public polyObject: PolyObject;
+    constructor(polyObject:PolyObject) {
         this.vertices = new Array();
         this.faces = new Array();
         this.edges = new Array();
+        this.polyObject = polyObject;
     }
     public triangulate() {
         const geometry = new BufferGeometry();
@@ -52,5 +57,29 @@ export class PolyMesh {
             }
         }
         return nearestFace;
+    }
+    public raycastFace(intersect: Intersection) {
+        if (intersect.faceIndex == undefined) return (this.faces[0]);
+        const triIndex = intersect.faceIndex;
+        let currentIndex = 0;
+        for (let i = 0; i < this.faces.length; i++) {
+            if (currentIndex + (this.faces[i].vertices.length - 2) > triIndex) {
+                return (this.faces[i]);
+            }
+            currentIndex += this.faces[i].vertices.length - 2;
+        }
+        return (this.faces[0]);
+    }
+    public getNearestPointOfFace(point: Vector3,face:Face) {
+        let minDistance = Infinity;
+        let nearestVertex: Vertex = this.vertices[0];
+        for (const vertex of face.vertices) {
+            const distance = point.distanceTo(vertex.position);
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestVertex = vertex;
+            }
+        }
+        return nearestVertex;
     }
 }
