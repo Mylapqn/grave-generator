@@ -1,10 +1,10 @@
 import { Line2, LineGeometry, LineMaterial } from 'three/examples/jsm/Addons.js';
 import './style.css'
-import { BoxGeometry, CatmullRomCurve3, DirectionalLight, ExtrudeGeometry, FrontSide, Group, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, PCFSoftShadowMap, PerspectiveCamera, PointLight, Raycaster, Scene, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
+import { BoxGeometry, CatmullRomCurve3, DirectionalLight, ExtrudeGeometry, FrontSide, Group, Intersection, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Object3DEventMap, PCFSoftShadowMap, PerspectiveCamera, PointLight, Raycaster, Scene, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
 import { Input, MouseButton } from './input';
 import { lerp } from 'three/src/math/MathUtils.js';
 import { PolyMesh } from './polymesh/polyMesh';
-import { EditingModes } from "./polymesh/editing";
+import { Editing, EditingModes, Gizmo } from "./polymesh/editing";
 import { Face } from './polymesh/face';
 import { Vertex } from './polymesh/vertex';
 import { PolyObject } from './polymesh/object';
@@ -23,30 +23,7 @@ async function init() {
     const scene = new Scene();
     const material = new MeshStandardMaterial({ color: 0x44AA88 });
 
-    const gizmo = new Group();
-    const moveGizmo = new Group();
-    const rotateGizmo = new Group();
-    const scaleGizmo = new Group();
-    gizmo.add(moveGizmo);
-    gizmo.add(rotateGizmo);
-    gizmo.add(scaleGizmo);
 
-    const gizmoThickness = 0.04;
-
-    const gizmoLength = 0.2;
-
-    const xMove = new Mesh(new BoxGeometry(gizmoLength, gizmoThickness, gizmoThickness), new MeshBasicMaterial({ color: 0xff0000 }));
-    xMove.position.x = gizmoLength / 2;
-
-    const yMove = new Mesh(new BoxGeometry(gizmoThickness, gizmoLength, gizmoThickness), new MeshBasicMaterial({ color: 0x00ff00 }));
-    yMove.position.y = gizmoLength / 2;
-
-    const zMove = new Mesh(new BoxGeometry(gizmoThickness, gizmoThickness, gizmoLength), new MeshBasicMaterial({ color: 0x0000ff }));
-    zMove.position.z = gizmoLength / 2;
-
-    moveGizmo.add(xMove);
-    moveGizmo.add(yMove);
-    moveGizmo.add(zMove);
 
 
     const group = new Group();
@@ -144,10 +121,25 @@ async function init() {
     let stats = "";
     let fov = camera.fov;
     let targetFov = fov;
+    let gizmoIntersect: Intersection | null;
+    Gizmo.init();
     function update() {
-        if (Input.mouse.movedThisFrame()) {
+        if (Input.mouse.movedThisFrame() && !Editing.operation) {
             raycaster.setFromCamera(Input.mouse.position.clone().divide({ x: window.innerWidth / 2, y: -window.innerHeight / 2 }).add({ x: -1, y: 1 }), camera);
-            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (Editing.selection.length > 0) {
+                const gizmoIntersects = raycaster.intersectObjects(Gizmo.gizmoGroup.children, true);
+                if (gizmoIntersects.length > 0) {
+                    gizmoIntersect = gizmoIntersects[0];
+                }
+                else {
+                    gizmoIntersect = null;
+                }
+            }
+            let intersects = raycaster.intersectObjects(scene.children, true);
+            //if (gizmoIntersect != null && Editing.selection.length > 0) {
+            //    intersects = [];
+            //}
+
             if (faceSelectionOutline) {
                 faceSelectionOutline.removeFromParent();
                 faceSelectionOutline.geometry.dispose();
@@ -194,7 +186,7 @@ async function init() {
                 Vertex.hovered = undefined;
             }
         }
-        if (Input.mouse.getButton(MouseButton.Left)) {
+        if (Input.mouse.getButton(MouseButton.Left) && !gizmoIntersect) {
             switch (editingMode) {
                 case EditingModes.Object: {
                     PolyObject.select(PolyObject.hovered);
@@ -202,10 +194,12 @@ async function init() {
                 }
                 case EditingModes.Vertex: {
                     Vertex.selected = Vertex.hovered;
+                    Editing.selection = Vertex.selected ? [Vertex.selected] : [];
                     break;
                 }
                 case EditingModes.Face: {
                     Face.selected = Face.hovered;
+                    Editing.selection = Face.selected ? [Face.selected] : [];
                     break;
                 }
             }
@@ -214,6 +208,8 @@ async function init() {
         stats += "Editing mode: " + ["Vertex", "Edge", "Face", "Object"][editingMode] + "\n";
         stats += "Selected Object: " + PolyObject.selected?.name + "\n";
         stats += "Hovered object: " + PolyObject.hovered?.name + "\n";
+        stats += "Editing selection: " + Editing.selection.length + "\n";
+        stats += "Gizmo move: " + Gizmo.moveInput.x + "\n";
 
         if (hoveredVertex) {
             //hoverPoint.position.copy(polyGeoMesh.localToWorld(hoveredVertex.position.clone()));
@@ -235,21 +231,21 @@ async function init() {
                     extruding = false;
                 }
          *//*         if (extruding) {
-          if (!editingVerts) {
-              const scale = Input.mouse.delta.dot(extrudingDirection);
-              extrudeDistance += scale;
-              for (const v of currentExtrudedFace.vertices) {
-                  v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
-              }
+      if (!editingVerts) {
+          const scale = Input.mouse.delta.dot(extrudingDirection);
+          extrudeDistance += scale;
+          for (const v of currentExtrudedFace.vertices) {
+              v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
           }
-          else {
-              hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
-          }
-          for (const f of pMesh.faces) {
-              f.calculateCenter();
-          }
-          polyGeoMesh.geometry = pMesh.triangulate();
-      } */
+      }
+      else {
+          hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
+      }
+      for (const f of pMesh.faces) {
+          f.calculateCenter();
+      }
+      polyGeoMesh.geometry = pMesh.triangulate();
+  } */
         if (Input.mouse.getButton(MouseButton.Wheel)) {
             rotVelocity.x = (Input.mouse.delta.x * 0.003);
             rotVelocity.z = (Input.mouse.delta.y * 0.003);
@@ -268,10 +264,11 @@ async function init() {
             editingMode = EditingModes.Face;
         }
         if (Input.getKeyUp("Tab")) {
-            editingMode = editingMode == EditingModes.Object && PolyObject.selected ? EditingModes.Face : EditingModes.Object;
+            editingMode = (editingMode == EditingModes.Object && PolyObject.selected != undefined) ? EditingModes.Face : EditingModes.Object;
         }
+        Editing.editMode = editingMode;
 
-        targetFov += Input.mouse.getScroll()*targetFov*.1;
+        targetFov += Input.mouse.getScroll() * targetFov * .1;
         targetFov = Math.max(10, Math.min(100, targetFov));
         fov = lerp(fov, targetFov, 0.1);
 
@@ -285,11 +282,13 @@ async function init() {
         renderer.render(scene, camera);
         if (PolyObject.selected) {
             renderer.clearDepth();
-            renderer.render(gizmo, camera);
+            renderer.render(Gizmo.gizmoGroup, camera);
         }
 
         statsDiv.innerText = stats;
         stats = "";
+        Gizmo.update(gizmoIntersect);
+        Editing.update();
         Input.update();
         window.requestAnimationFrame(update);
     }

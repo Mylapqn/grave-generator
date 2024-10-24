@@ -3,8 +3,9 @@ import { HalfEdge } from "./halfEdge";
 import { PolyMesh, VertTriangle } from "./polyMesh";
 import { Vertex } from "./vertex";
 import { Earcut } from "three/src/extras/Earcut.js";
+import { Selectable } from "./editing";
 
-export class Face {
+export class Face implements Selectable {
     public static selected?:Face;
     public static hovered?:Face;
 
@@ -19,6 +20,25 @@ export class Face {
         this.vertices = [];
         this.edges = [];
     }
+    select(selected?: Selectable): void {
+        throw new Error("Method not implemented.");
+    }
+    hover(hovered?: Selectable): void {
+        throw new Error("Method not implemented.");
+    }
+    setPosition(position: Vector3): void {
+        const oldPos = this.center.clone();
+        this.center.copy(position);
+        for (const vertex of this.vertices) {
+            vertex.position.copy(vertex.position.clone().sub(oldPos).add(this.center));
+        }
+        this.mesh.dirty = true;
+        this.mesh.polyObject.recalculate();
+    }
+    getPosition(): Vector3 {
+        return this.center.clone();
+    }
+
     public static fromVertices(mesh: PolyMesh, vertices: Vertex[]) {
         const face = new Face(mesh);
         const edges = new Array<HalfEdge>();

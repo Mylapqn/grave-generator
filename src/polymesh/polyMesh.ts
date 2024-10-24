@@ -13,6 +13,7 @@ export class PolyMesh {
     public faces: Face[];
     public edges: HalfEdge[];
     public polyObject: PolyObject;
+    public dirty = true;
     constructor(polyObject:PolyObject) {
         this.vertices = new Array();
         this.faces = new Array();
@@ -31,6 +32,7 @@ export class PolyMesh {
         geometry.setAttribute('position', new Float32BufferAttribute(points.flat(), 3));
         geometry.setIndex(indexTriangles);
         geometry.computeVertexNormals();
+        this.dirty = false;
         return geometry;
 
     }

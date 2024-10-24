@@ -1,8 +1,9 @@
 import { BufferGeometry, FrontSide, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { PolyMesh } from "./polyMesh";
 import { Face } from "./face";
+import { Editing, Selectable } from "./editing";
 
-export class PolyObject extends Object3D {
+export class PolyObject extends Object3D implements Selectable {
     public static hovered?: PolyObject;
     public static selected?: PolyObject;
     public polyMesh: PolyMesh;
@@ -33,6 +34,27 @@ export class PolyObject extends Object3D {
         this.name = "object";
         this.add(this.mesh);
     }
+    public recalculate() {
+        if(this.polyMesh.dirty){
+            for (const face of this.polyMesh.faces) {
+                face.calculateCenter();
+            }
+            this.geometry = this.polyMesh.triangulate();
+            this.mesh.geometry = this.geometry;
+        }
+    }
+    select(selected?: Selectable): void {
+        throw new Error("Method not implemented.");
+    }
+    hover(hovered?: Selectable): void {
+        throw new Error("Method not implemented.");
+    }
+    setPosition(position: Vector3): void {
+        this.position.copy(position);
+    }
+    getPosition(): Vector3 {
+        return this.position.clone();
+    }
 
     public static hover(hovered?: PolyObject) {
         if (this.hovered != hovered) {
@@ -50,6 +72,12 @@ export class PolyObject extends Object3D {
                 (this.selected?.mesh.material as MeshStandardMaterial)?.color.set(this.selected.color);
             this.selected = this.hovered;
             (this.selected?.mesh.material as MeshStandardMaterial)?.color.set(0xff0000);
+            if(this.selected){
+                Editing.selection.push(this.selected);
+            }
+            else {
+                Editing.selection = [];
+            }
         }
 
     }
