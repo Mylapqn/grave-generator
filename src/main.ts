@@ -1,6 +1,6 @@
-import { Line2, LineGeometry, LineMaterial } from 'three/examples/jsm/Addons.js';
+import { EffectComposer, Line2, LineGeometry, LineMaterial, RenderPass, ShaderPass } from 'three/examples/jsm/Addons.js';
 import './style.css'
-import { BoxGeometry, CatmullRomCurve3, DirectionalLight, DoubleSide, ExtrudeGeometry, FrontSide, Group, Intersection, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Object3DEventMap, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, PointLight, Raycaster, Scene, ShaderMaterial, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
+import { BoxGeometry, CatmullRomCurve3, DirectionalLight, DoubleSide, ExtrudeGeometry, FrontSide, Group, Intersection, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Object3DEventMap, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, PointLight, Raycaster, RenderTarget, Scene, ShaderMaterial, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
 import { Input, MouseButton } from './input';
 import { lerp } from 'three/src/math/MathUtils.js';
 import { PolyMesh } from './polymesh/polyMesh';
@@ -12,14 +12,17 @@ import gridVertRaw from "./shader/grid.vert?raw";
 import gridFragRaw from "./shader/grid.frag?raw";
 const gridVert = gridVertRaw.substring(gridVertRaw.indexOf("//THREE HEADER END"));
 const gridFrag = gridFragRaw.substring(gridFragRaw.indexOf("//THREE HEADER END"));
+import outlineFragRaw from "./shader/outline.frag?raw";
+const outlineFrag = outlineFragRaw.substring(outlineFragRaw.indexOf("//THREE HEADER END"));
+
+import outlineVertRaw from "./shader/outline.vert?raw";
+const outlineVert = outlineVertRaw.substring(outlineVertRaw.indexOf("//THREE HEADER END"));
 
 const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true })
 const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight);
 
-
 async function init() {
     const raycaster = new Raycaster();
-
     Input.init();
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = PCFSoftShadowMap
@@ -27,6 +30,12 @@ async function init() {
     const scene = new Scene();
     const material = new MeshStandardMaterial({ color: 0x44AA88 });
 
+    const composer = new EffectComposer(renderer);
+    composer.setSize(window.innerWidth, window.innerHeight);
+    const outlinePass = new ShaderPass(new ShaderMaterial({ fragmentShader: outlineFrag, vertexShader: outlineVert, uniforms: { "tDiffuse": { value: null }, "tOutlineMask": { value: null } } }));
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    composer.addPass(outlinePass);
 
 
 
@@ -108,7 +117,7 @@ async function init() {
     scene.add(new Line2(new LineGeometry().setPositions([0, 0, -100, 0, 0, 100]), new LineMaterial({ color: 0x009900, linewidth: 2 })));
 
     let gridPlane;
-    scene.add(gridPlane = new Mesh(new PlaneGeometry(100, 100, 1, 1), new ShaderMaterial({vertexShader:gridVert, fragmentShader:gridFrag,transparent:true,side:DoubleSide})));
+    scene.add(gridPlane = new Mesh(new PlaneGeometry(100, 100, 1, 1), new ShaderMaterial({ vertexShader: gridVert, fragmentShader: gridFrag, transparent: true, side: DoubleSide })));
     gridPlane.rotateX(-Math.PI / 2);
 
     window.requestAnimationFrame(update);
@@ -239,21 +248,21 @@ async function init() {
                     extruding = false;
                 }
          *//*         if (extruding) {
-     if (!editingVerts) {
-         const scale = Input.mouse.delta.dot(extrudingDirection);
-         extrudeDistance += scale;
-         for (const v of currentExtrudedFace.vertices) {
-             v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
-         }
-     }
-     else {
-         hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
-     }
-     for (const f of pMesh.faces) {
-         f.calculateCenter();
-     }
-     polyGeoMesh.geometry = pMesh.triangulate();
- } */
+   if (!editingVerts) {
+       const scale = Input.mouse.delta.dot(extrudingDirection);
+       extrudeDistance += scale;
+       for (const v of currentExtrudedFace.vertices) {
+           v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
+       }
+   }
+   else {
+       hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
+   }
+   for (const f of pMesh.faces) {
+       f.calculateCenter();
+   }
+   polyGeoMesh.geometry = pMesh.triangulate();
+} */
         if (Input.mouse.getButton(MouseButton.Wheel)) {
             rotVelocity.x = (Input.mouse.delta.x * 0.003);
             rotVelocity.z = (Input.mouse.delta.y * 0.003);
@@ -287,7 +296,7 @@ async function init() {
         cameraParent.rotateX(-rotVelocity.z * 0.5);
         //removeText(group);
         //group.add(createText((Math.random() + 1).toString(36).substring(7) + "0", font, material));
-        renderer.render(scene, camera);
+        composer.render();
         if (PolyObject.selected) {
             renderer.clearDepth();
             renderer.render(Gizmo.gizmoGroup, camera);

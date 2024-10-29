@@ -25,7 +25,6 @@ in vec2 uv;
 
 //THREE HEADER END
 
-
 out vec3 worldPosition;
 out vec2 texCoord;
 
@@ -33,12 +32,7 @@ uniform float uDistance;
 
 void main() {
 
-    vec3 pos = position.xyz * uDistance;
-    pos.xy += cameraPosition.xy;
-
-    worldPosition = position.xyz;
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     texCoord = uv;
-
+    gl_Position = modelViewMatrix * projectionMatrix * vec4(position, 1.f);
+    //gl_Position = vec4(position,1.);
 }
