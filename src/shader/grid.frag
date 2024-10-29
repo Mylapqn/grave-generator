@@ -7,6 +7,8 @@ uniform vec3 cameraPosition;
 out vec4 pc_fragColor;
 
 //THREE HEADER END
+layout (location = 2)
+out vec4 maskColor;
 
 in vec3 worldPosition;
 in vec2 texCoord;
@@ -23,7 +25,7 @@ float getGrid(float size, float thickness) {
     vec2 coord = worldPosition.xy / size;
     vec2 width = fwidth(coord);
     vec2 lineWidth = width * 2.f * thickness;
-    vec2 antialias = width;
+    vec2 antialias = width * 1.5f;
     vec2 lineUV = 1.f - abs(fract(coord) * 2.f - 1.f);
     vec2 line = smoothstep(lineWidth + antialias, lineWidth - antialias, lineUV);
     float result = mix(line.x, 1.f, line.y) * (1.f - length(width) * .5f);
@@ -35,6 +37,7 @@ void main() {
     float g1 = getGrid(.1f, .5f)*.1;
     float g2 = getGrid(1.f, 1.f)*.2;
     pc_fragColor = vec4(1.f, 1.f, 1.f, mix(g1, 1.f, g2));
+    maskColor = vec4(g2);
 
     if(pc_fragColor.a <= 0.0f)
         discard;

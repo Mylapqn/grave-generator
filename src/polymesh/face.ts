@@ -39,6 +39,17 @@ export class Face implements Selectable {
         return this.center.clone();
     }
 
+    setScale(scale: Vector3): void {
+        for (const vertex of this.vertices) {
+            vertex.position.copy(vertex.position.clone().sub(this.center).multiply(scale).add(this.center));
+        }
+        this.mesh.dirty = true;
+        this.mesh.polyObject.recalculate();
+    }
+    getScale(): Vector3 {
+        return new Vector3(1, 1, 1);
+    }
+
     public static fromVertices(mesh: PolyMesh, vertices: Vertex[]) {
         const face = new Face(mesh);
         const edges = new Array<HalfEdge>();

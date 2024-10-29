@@ -35,7 +35,7 @@ export class PolyObject extends Object3D implements Selectable {
         this.add(this.mesh);
     }
     public recalculate() {
-        if(this.polyMesh.dirty){
+        if (this.polyMesh.dirty) {
             for (const face of this.polyMesh.faces) {
                 face.calculateCenter();
             }
@@ -55,6 +55,12 @@ export class PolyObject extends Object3D implements Selectable {
     getPosition(): Vector3 {
         return this.position.clone();
     }
+    setScale(scale: Vector3): void {
+        this.scale.copy(scale);
+    }
+    getScale(): Vector3 {
+        return this.scale.clone();
+    }
 
     public static hover(hovered?: PolyObject) {
         if (this.hovered != hovered) {
@@ -68,11 +74,9 @@ export class PolyObject extends Object3D implements Selectable {
 
     public static select(selected?: PolyObject) {
         if (selected != this.selected) {
-            if (this.selected)
-                (this.selected?.mesh.material as MeshStandardMaterial)?.color.set(this.selected.color);
             this.selected = this.hovered;
-            (this.selected?.mesh.material as MeshStandardMaterial)?.color.set(0xff0000);
-            if(this.selected){
+            if (this.selected) {
+                Editing.selection = [];
                 Editing.selection.push(this.selected);
             }
             else {

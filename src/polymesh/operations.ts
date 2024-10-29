@@ -36,3 +36,17 @@ export class MoveOperation extends Operation {
         super.update();
     }
 }
+
+export class ScaleOperation extends Operation {
+    originalPosition: Vector3;
+    currentPosition: Vector3;
+    constructor(){
+        super();
+        this.originalPosition = Editing.selection[0].getScale().clone();
+        this.currentPosition = this.originalPosition.clone();
+    }
+    update(){
+        Editing.selection[0].setScale(this.currentPosition.add(Gizmo.moveInput));
+        super.update();
+    }
+}

@@ -29,6 +29,7 @@ void main() {
     float comb = (c1+c2+c3+c4)/4.;
     float outline = clamp(((comb-alpha)*10.),0.,1.);
     pc_fragColor = mix(col,vec4(1.,.6,0.,1.),outline);
+    pc_fragColor = texture(tOutlineMask,texCoord);
     
 
     //gl_FragColor = vec4(uColor.rgb, mix(g2, g1, g1) /** pow(d, 3.0)*/);

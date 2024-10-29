@@ -53,9 +53,13 @@ class Mouse {
     public position;
     public delta;
     public buttonsHeld = 0;
+    public lastButtonsHeld = 0;
     public scroll = 0;
     public getButton(button: MouseButton) {
         return this.buttonsHeld & (1 << (button));
+    }
+    public getButtonUp(button: MouseButton) {
+        return this.lastButtonsHeld & (1 << (button)) && !(this.buttonsHeld & (1 << (button)));
     }
     public getScroll(){
         return this.scroll;
@@ -88,5 +92,6 @@ class Mouse {
         this.delta.x = 0;
         this.delta.y = 0;
         this.scroll = 0;
+        this.lastButtonsHeld = this.buttonsHeld;
     }
 }

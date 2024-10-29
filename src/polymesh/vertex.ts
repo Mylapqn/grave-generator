@@ -26,6 +26,12 @@ export class Vertex implements Selectable {
     getPosition(): Vector3 {
         return this.position.clone();
     }
+    setScale(scale: Vector3): void {
+        throw new Error("Method not implemented.");
+    }
+    getScale(): Vector3 {
+        throw new Error("Method not implemented.");
+    }
     public getIndex() {
         return this.mesh.vertices.indexOf(this);
     }
