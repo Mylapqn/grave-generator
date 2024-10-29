@@ -1,6 +1,6 @@
 import { Line2, LineGeometry, LineMaterial } from 'three/examples/jsm/Addons.js';
 import './style.css'
-import { BoxGeometry, CatmullRomCurve3, DirectionalLight, ExtrudeGeometry, FrontSide, Group, Intersection, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Object3DEventMap, PCFSoftShadowMap, PerspectiveCamera, PointLight, Raycaster, Scene, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
+import { BoxGeometry, CatmullRomCurve3, DirectionalLight, DoubleSide, ExtrudeGeometry, FrontSide, Group, Intersection, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Object3DEventMap, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, PointLight, Raycaster, Scene, ShaderMaterial, Shape, SphereGeometry, Vector2, Vector3, WebGLRenderer } from 'three'
 import { Input, MouseButton } from './input';
 import { lerp } from 'three/src/math/MathUtils.js';
 import { PolyMesh } from './polymesh/polyMesh';
@@ -8,6 +8,10 @@ import { Editing, EditingModes, Gizmo } from "./polymesh/editing";
 import { Face } from './polymesh/face';
 import { Vertex } from './polymesh/vertex';
 import { PolyObject } from './polymesh/object';
+import gridVertRaw from "./shader/grid.vert?raw";
+import gridFragRaw from "./shader/grid.frag?raw";
+const gridVert = gridVertRaw.substring(gridVertRaw.indexOf("//THREE HEADER END"));
+const gridFrag = gridFragRaw.substring(gridFragRaw.indexOf("//THREE HEADER END"));
 
 const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true })
 const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight);
@@ -100,8 +104,12 @@ async function init() {
     //group.add(wireframe);
 
     scene.add(new Line2(new LineGeometry().setPositions([-100, 0, 0, 100, 0, 0]), new LineMaterial({ color: 0x990000, linewidth: 2 })));
-    scene.add(new Line2(new LineGeometry().setPositions([0, -100, 0, 0, 100, 0]), new LineMaterial({ color: 0x000099, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([0, -100, 0, 0, 100, 0]), new LineMaterial({ color: 0x3344aa, linewidth: 2 })));
     scene.add(new Line2(new LineGeometry().setPositions([0, 0, -100, 0, 0, 100]), new LineMaterial({ color: 0x009900, linewidth: 2 })));
+
+    let gridPlane;
+    scene.add(gridPlane = new Mesh(new PlaneGeometry(100, 100, 1, 1), new ShaderMaterial({vertexShader:gridVert, fragmentShader:gridFrag,transparent:true,side:DoubleSide})));
+    gridPlane.rotateX(-Math.PI / 2);
 
     window.requestAnimationFrame(update);
 
@@ -135,7 +143,7 @@ async function init() {
                     gizmoIntersect = null;
                 }
             }
-            let intersects = raycaster.intersectObjects(scene.children, true);
+            let intersects = raycaster.intersectObjects(group.children, true);
             //if (gizmoIntersect != null && Editing.selection.length > 0) {
             //    intersects = [];
             //}
@@ -231,21 +239,21 @@ async function init() {
                     extruding = false;
                 }
          *//*         if (extruding) {
-      if (!editingVerts) {
-          const scale = Input.mouse.delta.dot(extrudingDirection);
-          extrudeDistance += scale;
-          for (const v of currentExtrudedFace.vertices) {
-              v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
-          }
-      }
-      else {
-          hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
-      }
-      for (const f of pMesh.faces) {
-          f.calculateCenter();
-      }
-      polyGeoMesh.geometry = pMesh.triangulate();
-  } */
+     if (!editingVerts) {
+         const scale = Input.mouse.delta.dot(extrudingDirection);
+         extrudeDistance += scale;
+         for (const v of currentExtrudedFace.vertices) {
+             v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
+         }
+     }
+     else {
+         hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
+     }
+     for (const f of pMesh.faces) {
+         f.calculateCenter();
+     }
+     polyGeoMesh.geometry = pMesh.triangulate();
+ } */
         if (Input.mouse.getButton(MouseButton.Wheel)) {
             rotVelocity.x = (Input.mouse.delta.x * 0.003);
             rotVelocity.z = (Input.mouse.delta.y * 0.003);
@@ -254,13 +262,13 @@ async function init() {
             rotVelocity.x = lerp(rotVelocity.x, 0.00, 0.3);
             rotVelocity.z = lerp(rotVelocity.z, 0.00, 0.3);
         }
-        if (Input.getKeyUp("q")) {
+        if (Input.getKeyUp("+")) {
             editingMode = EditingModes.Vertex;
         }
-        if (Input.getKeyUp("w")) {
+        if (Input.getKeyUp("ě")) {
             editingMode = EditingModes.Edge;
         }
-        if (Input.getKeyUp("w")) {
+        if (Input.getKeyUp("š")) {
             editingMode = EditingModes.Face;
         }
         if (Input.getKeyUp("Tab")) {
