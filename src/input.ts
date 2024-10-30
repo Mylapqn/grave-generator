@@ -1,4 +1,5 @@
-import { Vector2 } from "three";
+import { Quaternion, Vector2, Vector3 } from "three";
+import { SceneState } from "./main";
 
 export class Input {
     static mouse: Mouse;
@@ -10,8 +11,8 @@ export class Input {
         this.heldKeys = new Map<string, boolean>();
         this.keysUp = new Map<string, boolean>();
         this.keysDown = new Map<string, boolean>();
-        window.addEventListener("keydown", e=>this.keyDown(e));
-        window.addEventListener("keyup", e=>this.keyUp(e));
+        window.addEventListener("keydown", e => this.keyDown(e));
+        window.addEventListener("keyup", e => this.keyUp(e));
     }
     static keyDown(e: KeyboardEvent) {
         this.heldKeys.set(e.key, true);
@@ -55,18 +56,20 @@ class Mouse {
     public buttonsHeld = 0;
     public lastButtonsHeld = 0;
     public scroll = 0;
+    public viewSpaceDelta;
     public getButton(button: MouseButton) {
         return this.buttonsHeld & (1 << (button));
     }
     public getButtonUp(button: MouseButton) {
         return this.lastButtonsHeld & (1 << (button)) && !(this.buttonsHeld & (1 << (button)));
     }
-    public getScroll(){
+    public getScroll() {
         return this.scroll;
     }
     constructor() {
         this.position = new Vector2();
         this.delta = new Vector2();
+        this.viewSpaceDelta = new Vector3();
         window.addEventListener("mousedown", e => this.mouseButtons(e));
         window.addEventListener("mouseup", e => this.mouseButtons(e));
         window.addEventListener("mousemove", e => this.mouseMove(e));
@@ -81,14 +84,16 @@ class Mouse {
         this.position.y = e.clientY;
         this.delta.x = e.movementX;
         this.delta.y = e.movementY;
+        this.viewSpaceDelta = new Vector3(Input.mouse.delta.x, -Input.mouse.delta.y, 0).multiplyScalar(0.0001 * SceneState.camera.fov).applyQuaternion(SceneState.camera.getWorldQuaternion(new Quaternion()));
     }
     mouseScroll(e: WheelEvent) {
-        this.scroll = e.deltaY/100;
+        this.scroll = e.deltaY / 100;
     }
-    movedThisFrame(){
+    movedThisFrame() {
         return (this.delta.x !== 0 || this.delta.y !== 0);
     }
     public update() {
+        this.viewSpaceDelta = new Vector3(0, 0, 0);
         this.delta.x = 0;
         this.delta.y = 0;
         this.scroll = 0;

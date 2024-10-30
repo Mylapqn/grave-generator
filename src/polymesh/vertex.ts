@@ -12,21 +12,29 @@ export class Vertex implements Selectable {
         this.mesh = mesh;
         this.mesh.vertices.push(this);
     }
+    captureState() {
+        return this.position.clone();
+    }
+    restoreState(state: Vector3): void {
+        this.position.copy(state);
+        this.mesh.dirty = true;
+        this.mesh.polyObject.recalculate();
+    }
     select(selected?: Selectable): void {
         throw new Error("Method not implemented.");
     }
     hover(hovered?: Selectable): void {
         throw new Error("Method not implemented.");
     }
-    setPosition(position: Vector3): void {
-        this.position.copy(position);
+    setPosition(state: Vector3,position: Vector3): void {
+        this.position.copy(state.clone().add(position));
         this.mesh.dirty = true;
         this.mesh.polyObject.recalculate();
     }
     getPosition(): Vector3 {
         return this.position.clone();
     }
-    setScale(scale: Vector3): void {
+    setScale(state: Vector3,scale: Vector3): void {
         throw new Error("Method not implemented.");
     }
     getScale(): Vector3 {

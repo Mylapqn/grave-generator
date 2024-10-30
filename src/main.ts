@@ -16,22 +16,32 @@ import outlineFragRaw from "./shader/outline.frag?raw";
 const outlineFrag = outlineFragRaw.substring(outlineFragRaw.indexOf("//THREE HEADER END"));
 
 import outlineVertRaw from "./shader/outline.vert?raw";
+import { AxisOperation, MoveOperation, Operation, ScaleOperation } from './polymesh/operations';
 const outlineVert = outlineVertRaw.substring(outlineVertRaw.indexOf("//THREE HEADER END"));
 
-const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true});
-const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight);
+const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true });
+export const defaultMaterial = new MeshStandardMaterial({ color: 0xDDDDDD, flatShading: true });
+export class SceneState {
+    static scene: Scene;
+    static camera: PerspectiveCamera;
+    static composer: EffectComposer;
+}
 
 async function init() {
+    const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight);
     const raycaster = new Raycaster();
     Input.init();
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = PCFSoftShadowMap
     renderer.autoClear = false;
     const scene = new Scene();
-    const material = new MeshStandardMaterial({ color: 0x44AA88 });
+    SceneState.scene = scene;
+    SceneState.camera = camera;
+
 
     //const renderTarget = new WebGLArrayRenderTarget(window.innerWidth, window.innerHeight,6,{});
     const composer = new EffectComposer(renderer);
+    SceneState.composer = composer;
     composer.setSize(window.innerWidth, window.innerHeight);
     const customOutlinePass = new ShaderPass(new ShaderMaterial({ fragmentShader: outlineFrag, vertexShader: outlineVert, uniforms: { "tDiffuse": { value: null }, "tOutlineMask": { value: null } } }));
     const renderPass = new RenderPass(scene, camera);
@@ -69,7 +79,7 @@ async function init() {
         new Vector3(1, 1, 0),
     ]);
     const extrudeGeometry = new ExtrudeGeometry(shape, { extrudePath: path, steps: 32 });
-    let extrude = new Mesh(extrudeGeometry, material);
+    let extrude = new Mesh(extrudeGeometry, defaultMaterial);
     extrude.receiveShadow = true;
     extrude.castShadow = true;
     //group.add(extrude);
@@ -80,10 +90,11 @@ async function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     camera.position.z = 5;
-    camera.position.y = 3;
-    camera.lookAt(new Vector3(0, 0, 0));
+    //camera.position.y = 3;
+    //camera.lookAt(new Vector3(0, 0, 0));
 
     const cameraParent = new Group();
+    cameraParent.lookAt(new Vector3(0, 3, 5));
     cameraParent.add(camera);
     scene.add(cameraParent);
 
@@ -105,25 +116,39 @@ async function init() {
     light.shadow.camera.near = 0.01;
     light.shadow.camera.far = 10
 
-    scene.add(light);
+    //scene.add(light);
 
-    const light2 = new DirectionalLight(0xFFFFFF, .3);
+    const light2 = new DirectionalLight(0xFFFFFF, 1);
 
-    light2.position.set(-3, -1, 1);
+    light2.position.set(-3, 0, 0);
     cameraParent.add(light2);
 
-    const light3 = new DirectionalLight(0xFFFFFF, .2);
+    const light3 = new DirectionalLight(0xFFFFFF, 2);
 
-    light3.position.set(3, 3, 3);
+    light3.position.set(0, 3, 0);
     cameraParent.add(light3);
+
+    const light4 = new DirectionalLight(0xFFFFFF, 2);
+
+    light4.position.set(2, 0, 3);
+    cameraParent.add(light4);
 
     const obj = new PolyObject();
     group.add(obj);
     //group.add(wireframe);
 
-    scene.add(new Line2(new LineGeometry().setPositions([-1000, 0, 0, 1000, 0, 0]), new LineMaterial({ color: 0x990000, linewidth: 2 })));
-    scene.add(new Line2(new LineGeometry().setPositions([0, -1000, 0, 0, 1000, 0]), new LineMaterial({ color: 0x3344aa, linewidth: 2 })));
-    scene.add(new Line2(new LineGeometry().setPositions([0, 0, -1000, 0, 0, 1000]), new LineMaterial({ color: 0x009900, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([-1000, 0, 0, 0, 0, 0]), new LineMaterial({ color: 0x990000, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([0, -1000, 0, 0, 0, 0]), new LineMaterial({ color: 0x009900, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([0, 0, -1000, 0, 0, 0]), new LineMaterial({ color: 0x3344aa, linewidth: 2 })));
+
+    scene.add(new Line2(new LineGeometry().setPositions([-0, 0, 0, 1000, 0, 0]), new LineMaterial({ color: 0xff0000, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([0, -0, 0, 0, 1000, 0]), new LineMaterial({ color: 0x00ff00, linewidth: 2 })));
+    scene.add(new Line2(new LineGeometry().setPositions([0, 0, -0, 0, 0, 1000]), new LineMaterial({ color: 0x3344ff, linewidth: 2 })));
+
+    let tempLineX: Line2, tempLineY: Line2, tempLineZ: Line2;
+    scene.add(tempLineX = new Line2(new LineGeometry().setPositions([-1000, 0, 0, 1000, 0, 0]), new LineMaterial({ color: 0xff0000, linewidth: 2 })));
+    scene.add(tempLineY = new Line2(new LineGeometry().setPositions([0, -1000, 0, 0, 1000, 0]), new LineMaterial({ color: 0x00ff00, linewidth: 2 })));
+    scene.add(tempLineZ = new Line2(new LineGeometry().setPositions([0, 0, -1000, 0, 0, 1000]), new LineMaterial({ color: 0x3344ff, linewidth: 2 })));
 
     let gridPlane = new Mesh(new PlaneGeometry(100, 100, 1, 1), new ShaderMaterial({ vertexShader: gridVert, fragmentShader: gridFrag, transparent: true, side: DoubleSide }));
     scene.add(gridPlane);
@@ -133,6 +158,7 @@ async function init() {
 
     let rotVelocity = new Vector3(0, 0, 0);
     let hoverPoint = new Mesh(new SphereGeometry(.03), new MeshBasicMaterial());
+    hoverPoint.position.set(2, 1, 1);
     let faceSelectionOutline: Line2 | null;
     let currentExtrudedFace: Face;
     let extruding = false;
@@ -149,6 +175,7 @@ async function init() {
     let targetFov = fov;
     let gizmoIntersect: Intersection | null;
     let groundIntersect: Intersection | null;
+    let customWireframe: Line2[] = [];
     Gizmo.init();
     function update() {
         if (Input.mouse.movedThisFrame() && !Editing.operation) {
@@ -168,11 +195,7 @@ async function init() {
             //    intersects = [];
             //}
 
-            if (faceSelectionOutline) {
-                faceSelectionOutline.removeFromParent();
-                faceSelectionOutline.geometry.dispose();
-                faceSelectionOutline = null;
-            }
+
             if (extruding) Face.hovered = currentExtrudedFace;
             else if (intersects.length > 0) {
 
@@ -189,15 +212,7 @@ async function init() {
                             if (Input.mouse.getButton(MouseButton.Left)) {
                                 Face.selected = Face.hovered;
                             }
-                            const positionsArrays = Face.hovered.vertices.map(v => v.position.clone().addScaledVector(Face.hovered!.normal, -0.01).toArray());
-                            positionsArrays.push(positionsArrays[0], positionsArrays[1], positionsArrays[2]);
-                            const lineGeometry = new LineGeometry().setPositions(positionsArrays.flat());
 
-                            faceSelectionOutline = new Line2(lineGeometry, new LineMaterial({ color: 0xffff44, linewidth: 3 }));
-                            faceSelectionOutline.position.copy(PolyObject.selected.position);
-                            faceSelectionOutline.rotation.copy(PolyObject.selected.rotation);
-                            faceSelectionOutline.scale.copy(PolyObject.selected.scale);
-                            scene.add(faceSelectionOutline);
                             break;
                         }
                         case EditingModes.Vertex: {
@@ -217,7 +232,7 @@ async function init() {
                 Vertex.hovered = undefined;
             }
         }
-        if (Input.mouse.getButtonUp(MouseButton.Left) && !gizmoIntersect) {
+        if (Input.mouse.getButtonUp(MouseButton.Left) && !gizmoIntersect && Editing.operation == null) {
             switch (editingMode) {
                 case EditingModes.Object: {
                     PolyObject.select(PolyObject.hovered);
@@ -226,22 +241,103 @@ async function init() {
                 }
                 case EditingModes.Vertex: {
                     Vertex.selected = Vertex.hovered;
-                    Editing.selection = Vertex.selected ? [Vertex.selected] : [];
+                    if (Vertex.selected) {
+                        if (Input.getKey("Shift")) {
+                            Editing.selection.push(Vertex.selected);
+                        }
+                        else {
+                            Editing.selection = [Vertex.selected];
+                        }
+                    }
+                    else {
+                        Editing.selection = [];
+                    }
                     break;
                 }
                 case EditingModes.Face: {
                     Face.selected = Face.hovered;
-                    Editing.selection = Face.selected ? [Face.selected] : [];
+                    if (Face.selected) {
+                        if (Input.getKey("Shift")) {
+                            Editing.selection.push(Face.selected);
+                        }
+                        else {
+                            Editing.selection = [Face.selected];
+                        }
+                    }
+                    else {
+                        Editing.selection = [];
+                    }
                     break;
                 }
             }
 
         }
+        for (const obj of customWireframe) {
+            obj.removeFromParent();
+            obj.geometry.dispose();
+        }
+        tempLineX.visible = false;
+        tempLineY.visible = false;
+        tempLineZ.visible = false;
+        if (Editing.operation && Editing.operation instanceof AxisOperation) {
+            if (Editing.operation.axisLock) {
+                if (Editing.operation.axis.x) {
+                    tempLineX.visible = true;
+                    tempLineX.position.copy(Editing.selection[0].getPosition());
+                }
+                if (Editing.operation.axis.y) {
+                    tempLineY.visible = true;
+                    tempLineY.position.copy(Editing.selection[0].getPosition());
+                }
+                if (Editing.operation.axis.z) {
+                    tempLineZ.visible = true;
+                    tempLineZ.position.copy(Editing.selection[0].getPosition());
+                }
+            }
+        }
+        customWireframe = [];
+        if (Editing.editMode != EditingModes.Object) {
+            if (PolyObject.selected) {
+                const mat = new LineMaterial({ color: 0xeeeeee, linewidth: 1 });
+                for (const face of PolyObject.selected.polyMesh.faces) {
+                    let wire;
+                    if (Editing.selection.includes(face) && Editing.editMode == EditingModes.Face) {
+                        wire = wireFace(face, new LineMaterial({ color: 0xffff44, linewidth: 3 }), 0.01);
+                    }
+                    else if (face == Face.hovered && Editing.editMode == EditingModes.Face) {
+                        wire = wireFace(face, new LineMaterial({ color: 0xffffff, linewidth: 3 }), 0.01);
+                    }
+                    else {
+                        wire = wireFace(face, mat, 0.001);
+                    }
+                    scene.add(wire);
+                    customWireframe.push(wire);
+                }
+            }
+        }
         stats += "Editing mode: " + ["Vertex", "Edge", "Face", "Object"][editingMode] + "\n";
-        stats += "Selected Object: " + PolyObject.selected?.name + "\n";
-        stats += "Hovered object: " + PolyObject.hovered?.name + "\n";
-        stats += "Editing selection: " + Editing.selection.length + "\n";
-        stats += "Gizmo move: " + Gizmo.moveInput.x + "\n";
+        //stats += "Selected Object: " + PolyObject.selected?.name + "\n";
+        //stats += "Hovered object: " + PolyObject.hovered?.name + "\n";
+        //stats += "Editing selection: " + Editing.selection.length + "\n";
+        //stats += "Gizmo move: " + Gizmo.moveInput.x + "\n";
+        //stats += "Operation:" + Editing.operation + "\n";
+        stats += "\n";
+        stats += "[Tab] Switch Edit Mode\n";
+        if (Editing.editMode == EditingModes.Object) {
+            stats += "[G] Move  [S] Scale  [RMB] Add Object" + "\n";
+        }
+        else {
+            stats += "[G] Move  [S] Scale  [E] Extrude  [I] Inset  \n[1] Edit Verts  [2] Edit Edges  [3] Edit Faces" + "\n";
+        }
+
+        if (Editing.operation) {
+            stats += "\nCurrent Operation: " + Editing.operation.name;
+            if (Editing.operation instanceof AxisOperation && Editing.operation.axisLock) {
+                stats += " on " + (Editing.operation.axis.x ? "X" : "") + (Editing.operation.axis.y ? "Y" : "") + (Editing.operation.axis.z ? "Z" : "");
+            }
+            stats += "\n";
+            stats += "[X][Y][Z] Axis Lock\n[LMB] Confirm  [RMB] Cancel" + "\n";
+        }
 
         if (hoveredVertex) {
             //hoverPoint.position.copy(polyGeoMesh.localToWorld(hoveredVertex.position.clone()));
@@ -263,27 +359,27 @@ async function init() {
                     extruding = false;
                 }
          *//*         if (extruding) {
- if (!editingVerts) {
-     const scale = Input.mouse.delta.dot(extrudingDirection);
-     extrudeDistance += scale;
-     for (const v of currentExtrudedFace.vertices) {
-         v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
-     }
- }
- else {
-     hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
- }
- for (const f of pMesh.faces) {
-     f.calculateCenter();
- }
- polyGeoMesh.geometry = pMesh.triangulate();
+if (!editingVerts) {
+const scale = Input.mouse.delta.dot(extrudingDirection);
+extrudeDistance += scale;
+for (const v of currentExtrudedFace.vertices) {
+v.position.addScaledVector(currentExtrudedFace.normal, scale * 0.01);
+}
+}
+else {
+hoveredVertex.position.addScaledVector(new Vector3(Input.mouse.delta.x, 0, Input.mouse.delta.y), 0.01);
+}
+for (const f of pMesh.faces) {
+f.calculateCenter();
+}
+polyGeoMesh.geometry = pMesh.triangulate();
 } */
         if (Input.mouse.getButton(MouseButton.Wheel)) {
             if (Input.getKey("Shift")) {
                 rotVelocity.x = 0;
                 rotVelocity.z = 0;
-                camera.translateX(-Input.mouse.delta.x * 0.01);
-                camera.translateY(Input.mouse.delta.y * 0.01);
+                cameraParent.translateX(-Input.mouse.delta.x * 0.01);
+                cameraParent.translateY(Input.mouse.delta.y * 0.01);
             }
             else {
                 rotVelocity.x = (Input.mouse.delta.x * 0.003);
@@ -294,7 +390,7 @@ async function init() {
             rotVelocity.x = lerp(rotVelocity.x, 0.00, 0.3);
             rotVelocity.z = lerp(rotVelocity.z, 0.00, 0.3);
         }
-        if (Input.mouse.getButtonUp(MouseButton.Right)) {
+        if (Input.mouse.getButtonUp(MouseButton.Right) && Editing.operation == null && editingMode == EditingModes.Object) {
             let obj = new PolyObject();
             if (groundIntersect) {
                 obj.position.copy(groundIntersect.point);
@@ -312,6 +408,37 @@ async function init() {
         }
         if (Input.getKeyUp("Tab")) {
             editingMode = (editingMode == EditingModes.Object && PolyObject.selected != undefined) ? EditingModes.Face : EditingModes.Object;
+            if (editingMode == EditingModes.Object && PolyObject.selected) {
+                Editing.selection = [PolyObject.selected];
+            }
+        }
+        if (Editing.selection.length > 0) {
+            if (Input.getKeyUp("g")) {
+                new MoveOperation(Editing.selection);
+            }
+            if (Input.getKeyUp("s")) {
+                new ScaleOperation(Editing.selection);
+            }
+            if (Editing.editMode == EditingModes.Face) {
+                if (Input.getKeyUp("e")) {
+                    if (Face.selected) {
+                        let newFace = Face.selected.extrude(0.01).top;
+                        Face.selected = newFace;
+                        Editing.selection = [newFace];
+                        let op = new MoveOperation(Editing.selection);
+                        op.axis = newFace.normal;
+                        op.axisLock = true;
+                    }
+                }
+                if (Input.getKeyUp("i")) {
+                    if (Face.selected) {
+                        let newFace = Face.selected.extrude(0).top;
+                        Face.selected = newFace;
+                        Editing.selection = [newFace];
+                        let op = new ScaleOperation(Editing.selection);
+                    }
+                }
+            }
         }
         Editing.editMode = editingMode;
 
@@ -324,6 +451,7 @@ async function init() {
 
         cameraParent.rotateOnWorldAxis(new Vector3(0, 1, 0), -rotVelocity.x);
         cameraParent.rotateX(-rotVelocity.z * 0.5);
+
         //removeText(group);
         //group.add(createText((Math.random() + 1).toString(36).substring(7) + "0", font, material));
         composer.render();
@@ -342,12 +470,24 @@ async function init() {
 }
 
 
-function worldToScreen(v: Vector3) {
-    const projected = v.project(camera);
+export function worldToScreen(v: Vector3) {
+    const projected = v.project(SceneState.camera);
     const vec = new Vector2();
     vec.x = (projected.x + 1) * window.innerWidth / 2;
     vec.y = - (projected.y - 1) * window.innerHeight / 2;
     return vec;
+}
+
+function wireFace(face: Face, material: LineMaterial, offset: number): Line2 {
+    const positionsArrays = face.vertices.map(v => v.position.clone().addScaledVector(face.normal, offset).toArray());
+    positionsArrays.push(positionsArrays[0], positionsArrays[1], positionsArrays[2]);
+    const lineGeometry = new LineGeometry().setPositions(positionsArrays.flat());
+
+    const wireFace = new Line2(lineGeometry, material);
+    wireFace.position.copy(face.mesh.polyObject.position);
+    wireFace.rotation.copy(face.mesh.polyObject.rotation);
+    wireFace.scale.copy(face.mesh.polyObject.scale);
+    return wireFace;
 }
 
 /* function createText(content: string, font: Font, material: Material) {
@@ -383,8 +523,9 @@ init();
 
 window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    SceneState.camera.aspect = window.innerWidth / window.innerHeight;
+    SceneState.camera.updateProjectionMatrix();
+    SceneState.composer.setSize(window.innerWidth, window.innerHeight);
 })
 
 window.addEventListener("mousedown", () => { })

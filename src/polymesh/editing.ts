@@ -32,10 +32,12 @@ export interface Selectable {
 
     select(selected?: Selectable): void;
     hover(hovered?: Selectable): void;
-    setPosition(position: Vector3): void;
+    setPosition(state:any, offset: Vector3): void;
     getPosition(): Vector3;
-    setScale(scale: Vector3): void;
+    setScale(state:any, scale: Vector3): void;
     getScale(): Vector3;
+    captureState(): any;
+    restoreState(state: any): void;
 }
 
 export class Gizmo {
@@ -69,7 +71,7 @@ export class Gizmo {
     }
     public static update(intersect: Intersection | null, camera: PerspectiveCamera) {
         this.moveInput = new Vector3();
-        const sensitivity = .1;
+        const sensitivity = .01;
         if (intersect && intersect.object && Input.mouse.getButton(MouseButton.Left)) {
             if (intersect.object == this.xMove) {
                 this.moveInput.x = Input.mouse.delta.x * sensitivity;
@@ -82,7 +84,7 @@ export class Gizmo {
             }
         }
         if (this.moveInput.length() > 0 && Editing.operation == null) {
-            new MoveOperation();
+            new MoveOperation(Editing.selection).gizmoInput = true;
         }
         if (Editing.selection.length > 0) {
             if (Editing.editMode != EditingModes.Object) {

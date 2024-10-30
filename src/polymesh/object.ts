@@ -1,7 +1,14 @@
-import { BufferGeometry, FrontSide, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
+import { BufferGeometry, Euler, FrontSide, Mesh, MeshStandardMaterial, Object3D, Vector3 } from "three";
 import { PolyMesh } from "./polyMesh";
 import { Face } from "./face";
 import { Editing, Selectable } from "./editing";
+import { defaultMaterial } from "../main";
+
+export type ObjectTransform ={
+    position: Vector3
+    scale: Vector3
+    rotation: Euler
+}
 
 export class PolyObject extends Object3D implements Selectable {
     public static hovered?: PolyObject;
@@ -9,7 +16,7 @@ export class PolyObject extends Object3D implements Selectable {
     public polyMesh: PolyMesh;
     public geometry: BufferGeometry;
     public mesh: Mesh;
-    public color = 0x44AA88;
+    public color = 0xDDDDDD;
     constructor() {
         super();
         this.polyMesh = new PolyMesh(this);
@@ -22,22 +29,37 @@ export class PolyObject extends Object3D implements Selectable {
             new Vector3(.5 - .5, 0, 1 - .5),
         ])*/
         Face.fromPoints(this.polyMesh, [
-            new Vector3(-.5, -.5, -.5),
-            new Vector3(-.5, -.5, .5),
             new Vector3(.5, -.5, .5),
             new Vector3(.5, -.5, -.5),
-        ]).extrude(-1);
+            new Vector3(-.5, -.5, -.5),
+            new Vector3(-.5, -.5, .5),
+        ]).extrude(1,false);
         this.geometry = this.polyMesh.triangulate();
-        this.mesh = new Mesh(this.geometry, new MeshStandardMaterial({ color: 0x44AA88, side: FrontSide, wireframe: false, flatShading: true }));
+        this.mesh = new Mesh(this.geometry, defaultMaterial.clone());
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
         this.name = "object";
         this.add(this.mesh);
+        //this.polyMesh.faces[0].setPosition(this.polyMesh.faces[0].captureState(), this.polyMesh.faces[0].normal.clone());
+        this.recalculate();
+    }
+    captureState() {
+        return {
+            position: this.position.clone(),
+            scale: this.scale.clone(),
+            rotation: this.rotation.clone(),
+        }
+    }
+    restoreState(state: ObjectTransform): void {
+        this.position.copy(state.position);
+        this.scale.copy(state.scale);
+        this.rotation.copy(state.rotation);
     }
     public recalculate() {
         if (this.polyMesh.dirty) {
             for (const face of this.polyMesh.faces) {
                 face.calculateCenter();
+                face.calculateNormal();
             }
             this.geometry = this.polyMesh.triangulate();
             this.mesh.geometry = this.geometry;
@@ -49,13 +71,13 @@ export class PolyObject extends Object3D implements Selectable {
     hover(hovered?: Selectable): void {
         throw new Error("Method not implemented.");
     }
-    setPosition(position: Vector3): void {
-        this.position.copy(position);
+    setPosition(state: ObjectTransform, position: Vector3): void {
+        this.position.copy(state.position.clone().add(position));
     }
     getPosition(): Vector3 {
         return this.position.clone();
     }
-    setScale(scale: Vector3): void {
+    setScale(state: ObjectTransform, scale: Vector3): void {
         this.scale.copy(scale);
     }
     getScale(): Vector3 {
@@ -65,10 +87,10 @@ export class PolyObject extends Object3D implements Selectable {
     public static hover(hovered?: PolyObject) {
         if (this.hovered != hovered) {
             if (this.hovered != this.selected)
-                (this.hovered?.mesh.material as MeshStandardMaterial)?.color.set(0x44AA88);
+                (this.hovered?.mesh.material as MeshStandardMaterial)?.color.set(0xDDDDDD);
             this.hovered = hovered;
             if (this.hovered != this.selected)
-                (this.hovered?.mesh.material as MeshStandardMaterial)?.color.set(0x66EEBB);
+                (this.hovered?.mesh.material as MeshStandardMaterial)?.color.set(0xFFFFFF);
         }
     }
 

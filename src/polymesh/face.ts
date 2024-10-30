@@ -6,8 +6,8 @@ import { Earcut } from "three/src/extras/Earcut.js";
 import { Selectable } from "./editing";
 
 export class Face implements Selectable {
-    public static selected?:Face;
-    public static hovered?:Face;
+    public static selected?: Face;
+    public static hovered?: Face;
 
     public vertices: Vertex[];
     public edges: HalfEdge[];
@@ -26,11 +26,11 @@ export class Face implements Selectable {
     hover(hovered?: Selectable): void {
         throw new Error("Method not implemented.");
     }
-    setPosition(position: Vector3): void {
-        const oldPos = this.center.clone();
-        this.center.copy(position);
-        for (const vertex of this.vertices) {
-            vertex.position.copy(vertex.position.clone().sub(oldPos).add(this.center));
+    setPosition(state: Vector3[], position: Vector3): void {
+        const oldCenter = state.reduce((a, b) => a.add(b), new Vector3()).divideScalar(state.length);
+        this.center.copy(oldCenter.clone().add(position));
+        for (let i = 0; i < this.vertices.length; i++) {
+            this.vertices[i].position.copy(state[i].clone().add(position));
         }
         this.mesh.dirty = true;
         this.mesh.polyObject.recalculate();
@@ -39,15 +39,28 @@ export class Face implements Selectable {
         return this.center.clone();
     }
 
-    setScale(scale: Vector3): void {
-        for (const vertex of this.vertices) {
-            vertex.position.copy(vertex.position.clone().sub(this.center).multiply(scale).add(this.center));
+    setScale(state: Vector3[], scale: Vector3): void {
+        for (let i = 0; i < this.vertices.length; i++) {
+            this.vertices[i].position.copy(state[i].clone().sub(this.center).multiply(scale).add(this.center));
         }
         this.mesh.dirty = true;
         this.mesh.polyObject.recalculate();
     }
     getScale(): Vector3 {
         return new Vector3(1, 1, 1);
+    }
+
+    captureState() {
+        return this.vertices.map(v => v.position.clone());
+    }
+
+    restoreState(state: Vector3[]) {
+        for (let i = 0; i < this.vertices.length; i++) {
+            this.vertices[i].position.copy(state[i]);
+        }
+        this.mesh.dirty = true;
+        this.mesh.polyObject.recalculate();
+        this.calculateCenter();
     }
 
     public static fromVertices(mesh: PolyMesh, vertices: Vertex[]) {
@@ -58,10 +71,8 @@ export class Face implements Selectable {
         }
         face.vertices = vertices;
         face.edges = edges;
-        const p0 = vertices[0].position.clone().sub(vertices[1].position);
-        const p1 = vertices[2].position.clone().sub(vertices[1].position);
-        face.normal = p0.clone().cross(p1).normalize();
         face.calculateCenter();
+        face.calculateNormal();
         return face;
     }
     public static fromPoints(mesh: PolyMesh, points: Vector3[]) {
@@ -74,12 +85,22 @@ export class Face implements Selectable {
     public calculateCenter() {
         this.center = this.vertices.reduce((a, b) => a.add(b.position), new Vector3()).divideScalar(this.vertices.length);
     }
+    public calculateNormal() {
+        const p0 = this.vertices[0].position.clone().sub(this.vertices[1].position);
+        const p1 = this.vertices[2].position.clone().sub(this.vertices[1].position);
+        this.normal = p1.clone().cross(p0).normalize();
+    }
+    public flip(){
+        this.vertices.reverse();
+        this.calculateCenter();
+        this.calculateNormal();
+    }
     //triangulate with ear clipping
     public triangulate() {
 
         const d3verts = this.vertices.map(v => v.position);
         const u = d3verts[1].clone().sub(d3verts[0]).normalize();
-        const v = u.clone().cross(this.normal).normalize();
+        const v = this.normal.clone().cross(u).normalize();
         const d2verts: Vector2Tuple[] = [];
         for (let i = 0; i < d3verts.length; i++) {
             d2verts.push([d3verts[i].dot(u), d3verts[i].dot(v)]);
@@ -126,7 +147,7 @@ export class Face implements Selectable {
         }
         return true;
     }
-    public extrude(distance: number) {
+    public extrude(distance: number,remove: boolean = true) {
         const newVertices = [];
         for (const vertex of this.vertices) {
             newVertices.push(new Vertex(this.mesh, vertex.position.clone().add(this.normal.clone().multiplyScalar(distance))));
@@ -136,17 +157,23 @@ export class Face implements Selectable {
         const sideFaces = [];
         for (let i = 0; i < this.vertices.length; i++) {
             const prev = i > 0 ? i - 1 : this.vertices.length - 1;
-            const sideVerts = [this.vertices[i], this.vertices[prev], newVertices[prev], newVertices[i]];
-            if(distance < 0) sideVerts.reverse();
-            sideFaces.push(Face.fromVertices(this.mesh,sideVerts));
+            const sideVerts = [this.vertices[i], newVertices[i], newVertices[prev], this.vertices[prev]];
+            //const sideVerts = [this.vertices[i], this.vertices[prev], newVertices[prev], newVertices[i]];
+            //if (distance < 0) sideVerts.reverse();
+            sideFaces.push(Face.fromVertices(this.mesh, sideVerts));
         }
-        this.remove();
+        if(remove){
+            this.remove();
+        }
+        else {
+            this.flip();
+        }
         return {
             top: Face.fromVertices(this.mesh, newVertices),
             sides: sideFaces
         }
     }
-    public remove(){
-        this.mesh.faces.splice(this.mesh.faces.indexOf(this),1);
+    public remove() {
+        this.mesh.faces.splice(this.mesh.faces.indexOf(this), 1);
     }
 }

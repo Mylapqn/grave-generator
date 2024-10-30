@@ -34,8 +34,8 @@ float getGrid(float size, float thickness) {
 
 void main() {
 
-    float g1 = getGrid(.1f, .5f)*.1;
-    float g2 = getGrid(1.f, 1.f)*.2;
+    float g1 = getGrid(.1f, .5f)*.03;
+    float g2 = getGrid(1.f, 1.f)*.06;
     pc_fragColor = vec4(1.f, 1.f, 1.f, mix(g1, 1.f, g2));
     maskColor = vec4(g2);
 
