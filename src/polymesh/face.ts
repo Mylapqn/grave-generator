@@ -1,4 +1,4 @@
-import { Vector2Tuple, Vector3 } from "three";
+import { Euler, Vector2Tuple, Vector3 } from "three";
 import { HalfEdge } from "./halfEdge";
 import { PolyMesh, VertTriangle } from "./polyMesh";
 import { Vertex } from "./vertex";
@@ -21,10 +21,8 @@ export class Face implements Selectable {
         this.edges = [];
     }
     select(selected?: Selectable): void {
-        throw new Error("Method not implemented.");
     }
     hover(hovered?: Selectable): void {
-        throw new Error("Method not implemented.");
     }
     setPosition(state: Vector3[], position: Vector3): void {
         const oldCenter = state.reduce((a, b) => a.add(b), new Vector3()).divideScalar(state.length);
@@ -61,6 +59,12 @@ export class Face implements Selectable {
         this.mesh.dirty = true;
         this.mesh.polyObject.recalculate();
         this.calculateCenter();
+    }
+    getRotation(): Euler {
+        return new Euler();
+    }
+    setRotation(state: any, rotation: Euler): void {
+        
     }
 
     public static fromVertices(mesh: PolyMesh, vertices: Vertex[]) {
@@ -163,7 +167,7 @@ export class Face implements Selectable {
             sideFaces.push(Face.fromVertices(this.mesh, sideVerts));
         }
         if(remove){
-            this.remove();
+            this.destroy();
         }
         else {
             this.flip();
@@ -173,7 +177,12 @@ export class Face implements Selectable {
             sides: sideFaces
         }
     }
-    public remove() {
+    public destroy() {
         this.mesh.faces.splice(this.mesh.faces.indexOf(this), 1);
+        for(const vertex of this.vertices){
+            vertex.removeIfUnused();
+        }
+        this.mesh.dirty = true;
+        this.mesh.polyObject.recalculate();
     }
 }

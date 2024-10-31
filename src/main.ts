@@ -16,11 +16,11 @@ import outlineFragRaw from "./shader/outline.frag?raw";
 const outlineFrag = outlineFragRaw.substring(outlineFragRaw.indexOf("//THREE HEADER END"));
 
 import outlineVertRaw from "./shader/outline.vert?raw";
-import { AxisOperation, MoveOperation, Operation, ScaleOperation } from './polymesh/operations';
+import { AxisOperation, MoveOperation, Operation, RotateOperation, ScaleOperation } from './polymesh/operations';
 const outlineVert = outlineVertRaw.substring(outlineVertRaw.indexOf("//THREE HEADER END"));
 
 const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true });
-export const defaultMaterial = new MeshStandardMaterial({ color: 0xDDDDDD, flatShading: true });
+export const defaultMaterial = new MeshStandardMaterial({ color: 0xDDDDDD, flatShading: true,side:DoubleSide });
 export class SceneState {
     static scene: Scene;
     static camera: PerspectiveCamera;
@@ -121,17 +121,17 @@ async function init() {
     const light2 = new DirectionalLight(0xFFFFFF, 1);
 
     light2.position.set(-3, 0, 0);
-    cameraParent.add(light2);
+    scene.add(light2);
 
     const light3 = new DirectionalLight(0xFFFFFF, 2);
 
     light3.position.set(0, 3, 0);
-    cameraParent.add(light3);
+    scene.add(light3);
 
     const light4 = new DirectionalLight(0xFFFFFF, 2);
 
     light4.position.set(2, 0, 3);
-    cameraParent.add(light4);
+    scene.add(light4);
 
     const obj = new PolyObject();
     group.add(obj);
@@ -157,14 +157,16 @@ async function init() {
     window.requestAnimationFrame(update);
 
     let rotVelocity = new Vector3(0, 0, 0);
-    let hoverPoint = new Mesh(new SphereGeometry(.03), new MeshBasicMaterial());
-    hoverPoint.position.set(2, 1, 1);
+    const hoverGeo = new SphereGeometry(.025);
+    const vertGeo = new SphereGeometry(.015);
+    const hoverMat = new MeshBasicMaterial();
+    const selectMat = new MeshBasicMaterial({ color: 0xffff00 });
+    const vertexMat = new MeshBasicMaterial({ color: 0xaaaaaa });
     let faceSelectionOutline: Line2 | null;
     let currentExtrudedFace: Face;
     let extruding = false;
     let extrudeDistance = 0;
     let extrudingDirection: Vector2;
-    scene.add(hoverPoint);
     let hoveredVertex: Vertex;
     let editingVerts = false;
     let editingMode: EditingModes = EditingModes.Object;
@@ -175,7 +177,7 @@ async function init() {
     let targetFov = fov;
     let gizmoIntersect: Intersection | null;
     let groundIntersect: Intersection | null;
-    let customWireframe: Line2[] = [];
+    let customWireframe: (Line2 | Mesh)[] = [];
     Gizmo.init();
     function update() {
         if (Input.mouse.movedThisFrame() && !Editing.operation) {
@@ -219,7 +221,6 @@ async function init() {
                             if (Input.mouse.getButton(MouseButton.Left)) {
                                 Vertex.selected = Vertex.hovered;
                             }
-                            hoverPoint.position.copy(Vertex.hovered.position);
                             break;
                         }
 
@@ -281,15 +282,15 @@ async function init() {
         tempLineZ.visible = false;
         if (Editing.operation && Editing.operation instanceof AxisOperation) {
             if (Editing.operation.axisLock) {
-                if (Editing.operation.axis.x) {
+                if (Editing.operation.axis.x == 1) {
                     tempLineX.visible = true;
                     tempLineX.position.copy(Editing.selection[0].getPosition());
                 }
-                if (Editing.operation.axis.y) {
+                if (Editing.operation.axis.y == 1) {
                     tempLineY.visible = true;
                     tempLineY.position.copy(Editing.selection[0].getPosition());
                 }
-                if (Editing.operation.axis.z) {
+                if (Editing.operation.axis.z == 1) {
                     tempLineZ.visible = true;
                     tempLineZ.position.copy(Editing.selection[0].getPosition());
                 }
@@ -298,6 +299,24 @@ async function init() {
         customWireframe = [];
         if (Editing.editMode != EditingModes.Object) {
             if (PolyObject.selected) {
+                if (Editing.editMode == EditingModes.Vertex) {
+                    for (const vertex of PolyObject.selected.polyMesh.vertices) {
+                        let hoverVert;
+                        if (Editing.selection.includes(vertex)) {
+                            hoverVert = new Mesh(hoverGeo, selectMat);
+                        }
+                        else if (vertex == Vertex.hovered) {
+                            hoverVert = new Mesh(hoverGeo, hoverMat);
+                        }
+                        else {
+                            hoverVert = new Mesh(vertGeo, hoverMat);
+                        }
+                        hoverVert.position.copy(vertex.getPosition());
+                        scene.add(hoverVert);
+                        customWireframe.push(hoverVert);
+                    }
+                }
+
                 const mat = new LineMaterial({ color: 0xeeeeee, linewidth: 1 });
                 for (const face of PolyObject.selected.polyMesh.faces) {
                     let wire;
@@ -313,6 +332,7 @@ async function init() {
                     scene.add(wire);
                     customWireframe.push(wire);
                 }
+
             }
         }
         stats += "Editing mode: " + ["Vertex", "Edge", "Face", "Object"][editingMode] + "\n";
@@ -324,7 +344,7 @@ async function init() {
         stats += "\n";
         stats += "[Tab] Switch Edit Mode\n";
         if (Editing.editMode == EditingModes.Object) {
-            stats += "[G] Move  [S] Scale  [RMB] Add Object" + "\n";
+            stats += "[G] Move  [R] Rotate  [S] Scale  [RMB] Add Object" + "\n";
         }
         else {
             stats += "[G] Move  [S] Scale  [E] Extrude  [I] Inset  \n[1] Edit Verts  [2] Edit Edges  [3] Edit Faces" + "\n";
@@ -333,10 +353,13 @@ async function init() {
         if (Editing.operation) {
             stats += "\nCurrent Operation: " + Editing.operation.name;
             if (Editing.operation instanceof AxisOperation && Editing.operation.axisLock) {
-                stats += " on " + (Editing.operation.axis.x ? "X" : "") + (Editing.operation.axis.y ? "Y" : "") + (Editing.operation.axis.z ? "Z" : "");
+                stats += " on " + (Editing.operation.axis.x >= 1 ? "X" : "") + (Editing.operation.axis.y >= 1 ? "Y" : "") + (Editing.operation.axis.z >= 1 ? "Z" : "");
             }
             stats += "\n";
             stats += "[X][Y][Z] Axis Lock\n[LMB] Confirm  [RMB] Cancel" + "\n";
+        }
+        else {
+            stats += "[X] Delete" + "\n";
         }
 
         if (hoveredVertex) {
@@ -411,6 +434,9 @@ polyGeoMesh.geometry = pMesh.triangulate();
             if (editingMode == EditingModes.Object && PolyObject.selected) {
                 Editing.selection = [PolyObject.selected];
             }
+            else {
+                Editing.selection = [];
+            }
         }
         if (Editing.selection.length > 0) {
             if (Input.getKeyUp("g")) {
@@ -418,6 +444,14 @@ polyGeoMesh.geometry = pMesh.triangulate();
             }
             if (Input.getKeyUp("s")) {
                 new ScaleOperation(Editing.selection);
+            }
+            if (Input.getKeyUp("r")) {
+                new RotateOperation(Editing.selection);
+            }
+            if (Input.getKeyUp("Delete") || Input.getKeyUp("x") && Editing.operation == null) {
+                for (const obj of Editing.selection) {
+                    obj.destroy();
+                }
             }
             if (Editing.editMode == EditingModes.Face) {
                 if (Input.getKeyUp("e")) {
@@ -436,6 +470,15 @@ polyGeoMesh.geometry = pMesh.triangulate();
                         Face.selected = newFace;
                         Editing.selection = [newFace];
                         let op = new ScaleOperation(Editing.selection);
+                    }
+                }
+            }
+            else if (Editing.editMode == EditingModes.Vertex) {
+                if (Input.getKeyUp("f") && PolyObject.selected) {
+                    if (Editing.selection.length >= 3) {
+                        Face.fromVertices(PolyObject.selected.polyMesh, Editing.selection as Vertex[]);
+                        PolyObject.selected.polyMesh.dirty = true;
+                        PolyObject.selected.recalculate();
                     }
                 }
             }

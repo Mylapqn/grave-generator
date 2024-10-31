@@ -1,4 +1,4 @@
-import { CoordinateSystem, Object3D, Quaternion, Vector2, Vector3 } from "three";
+import { CoordinateSystem, Euler, Object3D, Quaternion, Vector2, Vector3 } from "three";
 import { Input, MouseButton } from "../input";
 import { Editing, Gizmo, Selectable } from "./editing";
 import { SceneState, worldToScreen } from "../main";
@@ -144,6 +144,46 @@ export class ScaleOperation extends AxisOperation {
         }
         for (let i = 0; i < this.selection.length; i++) {
             this.selection[i].setScale(this.currentState[i], this.currentPosition.clone());
+        }
+        super.update();
+    }
+}
+
+export class RotateOperation extends AxisOperation {
+    name = "Rotate"
+    startRotation: Euler;
+    curRotation: Euler;
+    startMousePosition: Vector2;
+    startMouseDistance: number;
+    totalInput = 0;
+    constructor(selection: Selectable[]) {
+        super(selection);
+        this.startRotation = Editing.selection[0].getRotation().clone();
+        this.curRotation = this.startRotation.clone();
+        this.startMousePosition = worldToScreen(Editing.selection[0].getPosition());
+        this.startMouseDistance = Input.mouse.position.distanceTo(this.startMousePosition);
+    }
+    restoreState(): void {
+        super.restoreState();
+        this.curRotation = this.startRotation.clone();
+    }
+    update() {
+        if (this.gizmoInput) {
+        }
+        else {
+            this.totalInput += Input.mouse.delta.x * 0.01;
+            if (this.axisLock) {
+                let curQuat = new Quaternion().setFromEuler(this.startRotation).multiply(new Quaternion().setFromAxisAngle(this.axis, this.totalInput));
+                this.curRotation.setFromQuaternion(curQuat);
+            }
+            else {
+                let curQuat = new Quaternion().setFromEuler(this.startRotation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1).applyQuaternion(SceneState.camera.getWorldQuaternion(new Quaternion())), this.totalInput));
+                this.curRotation.setFromQuaternion(curQuat);
+            }
+            console.log(Editing.selection[0]);
+        }
+        for (let i = 0; i < this.selection.length; i++) {
+            this.selection[i].setRotation(this.currentState[i], this.curRotation.clone());
         }
         super.update();
     }

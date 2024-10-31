@@ -83,6 +83,17 @@ export class PolyObject extends Object3D implements Selectable {
     getScale(): Vector3 {
         return this.scale.clone();
     }
+    setRotation(state: any, rotation: Euler): void {
+        this.rotation.copy(rotation);
+    }
+    getRotation(): Euler {
+        return this.rotation.clone();
+    }
+
+    destroy(){
+        this.removeFromParent();
+        this.geometry.dispose();
+    }
 
     public static hover(hovered?: PolyObject) {
         if (this.hovered != hovered) {

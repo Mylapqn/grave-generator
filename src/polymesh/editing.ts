@@ -1,4 +1,4 @@
-import { BoxGeometry, Intersection, Mesh, MeshBasicMaterial, Vector3, Group, Camera, PerspectiveCamera } from "three";
+import { BoxGeometry, Intersection, Mesh, MeshBasicMaterial, Vector3, Group, Camera, PerspectiveCamera, Euler } from "three";
 import { MoveOperation, Operation, ScaleOperation } from "./operations";
 import { Input, MouseButton } from "../input";
 import { PolyObject } from "./object";
@@ -36,8 +36,11 @@ export interface Selectable {
     getPosition(): Vector3;
     setScale(state:any, scale: Vector3): void;
     getScale(): Vector3;
+    setRotation(state: any, rotation: Euler): void;
+    getRotation(): Euler;
     captureState(): any;
     restoreState(state: any): void;
+    destroy(): void;
 }
 
 export class Gizmo {
