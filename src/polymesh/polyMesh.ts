@@ -7,20 +7,20 @@ import { PolyObject } from "./object";
 export type VertTriangle = [Vertex, Vertex, Vertex];
 
 export class PolyMesh {
-    public static selected:PolyMesh;
-    public static hovered:PolyMesh;
+    public static selected: PolyMesh;
+    public static hovered: PolyMesh;
     public vertices: Vertex[];
     public faces: Face[];
     public edges: HalfEdge[];
     public polyObject: PolyObject;
     public dirty = true;
-    constructor(polyObject:PolyObject) {
+    constructor(polyObject: PolyObject) {
         this.vertices = new Array();
         this.faces = new Array();
         this.edges = new Array();
         this.polyObject = polyObject;
     }
-    public triangulate() {
+    /* public triangulate() {
         const geometry = new BufferGeometry();
 
         //get triangles from each face
@@ -35,6 +35,30 @@ export class PolyMesh {
         this.dirty = false;
         return geometry;
 
+    } */
+    public triangulate(sharp = true) {
+        const geometry = new BufferGeometry();
+        const outTriangles = [];
+        let indexTriangles = [];
+        let points = [];
+        for (const face of this.faces) {
+            outTriangles.push(...face.triangulate());
+        }
+        if (sharp) {
+            for (let i = 0; i < outTriangles.length; i += 1) {
+                points.push(this.vertices[outTriangles[i]].position.toArray());
+                indexTriangles.push(i);
+            }
+        }
+        else {
+            indexTriangles = outTriangles;
+            points = this.vertices.map(v => v.position.toArray());
+        }
+        geometry.setAttribute('position', new Float32BufferAttribute(points.flat(), 3));
+        geometry.setIndex(indexTriangles);
+        geometry.computeVertexNormals();
+        this.dirty = false;
+        return geometry;
     }
     public getNearestPoint(point: Vector3) {
         let minDistance = Infinity;
@@ -72,7 +96,7 @@ export class PolyMesh {
         }
         return (this.faces[0]);
     }
-    public getNearestPointOfFace(point: Vector3,face:Face) {
+    public getNearestPointOfFace(point: Vector3, face: Face) {
         let minDistance = Infinity;
         let nearestVertex: Vertex = this.vertices[0];
         for (const vertex of face.vertices) {

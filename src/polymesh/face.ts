@@ -155,8 +155,8 @@ export class Face implements Selectable {
         const newVertices = [];
         for (const vertex of this.vertices) {
             newVertices.push(new Vertex(this.mesh, vertex.position.clone().add(this.normal.clone().multiplyScalar(distance))));
-            console.log(vertex.position);
-            console.log(newVertices[newVertices.length - 1].position);
+            //console.log(vertex.position);
+            //console.log(newVertices[newVertices.length - 1].position);
         }
         const sideFaces = [];
         for (let i = 0; i < this.vertices.length; i++) {

@@ -1,10 +1,11 @@
-import { EffectComposer, Line2, LineGeometry, LineMaterial, OutlinePass, RenderPass, ShaderPass } from 'three/examples/jsm/Addons.js';
+import { EffectComposer, GLTFExporter, Line2, LineGeometry, LineMaterial, OutlinePass, RenderPass, ShaderPass } from 'three/examples/jsm/Addons.js';
 import './style.css'
+import "./ui.css"
 import { BoxGeometry, CatmullRomCurve3, Color, DirectionalLight, DoubleSide, ExtrudeGeometry, FrontSide, Group, Intersection, LessEqualDepth, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Object3DEventMap, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, PointLight, Raycaster, RenderTarget, Scene, ShaderMaterial, Shape, SphereGeometry, Vector2, Vector3, WebGLArrayRenderTarget, WebGLRenderer } from 'three'
 import { Input, MouseButton } from './input';
 import { lerp } from 'three/src/math/MathUtils.js';
 import { PolyMesh } from './polymesh/polyMesh';
-import { Editing, EditingModes, Gizmo } from "./polymesh/editing";
+import { Editing, EditingModes, Gizmo, Selectable } from "./polymesh/editing";
 import { Face } from './polymesh/face';
 import { Vertex } from './polymesh/vertex';
 import { PolyObject } from './polymesh/object';
@@ -17,17 +18,22 @@ const outlineFrag = outlineFragRaw.substring(outlineFragRaw.indexOf("//THREE HEA
 
 import outlineVertRaw from "./shader/outline.vert?raw";
 import { AxisOperation, MoveOperation, Operation, RotateOperation, ScaleOperation } from './polymesh/operations';
+import { UI, UIButton, UIContextMenu, UIDivider } from './ui';
+import { remove } from 'three/examples/jsm/libs/tween.module.js';
 const outlineVert = outlineVertRaw.substring(outlineVertRaw.indexOf("//THREE HEADER END"));
 
 const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true });
-export const defaultMaterial = new MeshStandardMaterial({ color: 0xDDDDDD, flatShading: true,side:DoubleSide });
+export const defaultMaterial = new MeshStandardMaterial({ color: 0xDDDDDD, flatShading: false, side: DoubleSide });
+const exporter = new GLTFExporter();
 export class SceneState {
     static scene: Scene;
+    static objectGroup: Group;
     static camera: PerspectiveCamera;
     static composer: EffectComposer;
 }
 
 async function init() {
+    UI.init();
     const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight);
     const raycaster = new Raycaster();
     Input.init();
@@ -58,6 +64,7 @@ async function init() {
 
 
     const group = new Group();
+    SceneState.objectGroup = group;
     scene.add(group);
 
 
@@ -180,6 +187,7 @@ async function init() {
     let customWireframe: (Line2 | Mesh)[] = [];
     Gizmo.init();
     function update() {
+        UI.update();
         if (Input.mouse.movedThisFrame() && !Editing.operation) {
             raycaster.setFromCamera(Input.mouse.position.clone().divide({ x: window.innerWidth / 2, y: -window.innerHeight / 2 }).add({ x: -1, y: 1 }), camera);
             if (Editing.selection.length > 0) {
@@ -233,46 +241,7 @@ async function init() {
                 Vertex.hovered = undefined;
             }
         }
-        if (Input.mouse.getButtonUp(MouseButton.Left) && !gizmoIntersect && Editing.operation == null) {
-            switch (editingMode) {
-                case EditingModes.Object: {
-                    PolyObject.select(PolyObject.hovered);
-                    outlinePass.selectedObjects = PolyObject.selected ? [PolyObject.selected] : [];
-                    break;
-                }
-                case EditingModes.Vertex: {
-                    Vertex.selected = Vertex.hovered;
-                    if (Vertex.selected) {
-                        if (Input.getKey("Shift")) {
-                            Editing.selection.push(Vertex.selected);
-                        }
-                        else {
-                            Editing.selection = [Vertex.selected];
-                        }
-                    }
-                    else {
-                        Editing.selection = [];
-                    }
-                    break;
-                }
-                case EditingModes.Face: {
-                    Face.selected = Face.hovered;
-                    if (Face.selected) {
-                        if (Input.getKey("Shift")) {
-                            Editing.selection.push(Face.selected);
-                        }
-                        else {
-                            Editing.selection = [Face.selected];
-                        }
-                    }
-                    else {
-                        Editing.selection = [];
-                    }
-                    break;
-                }
-            }
 
-        }
         for (const obj of customWireframe) {
             obj.removeFromParent();
             obj.geometry.dispose();
@@ -311,7 +280,7 @@ async function init() {
                         else {
                             hoverVert = new Mesh(vertGeo, hoverMat);
                         }
-                        hoverVert.position.copy(vertex.getPosition());
+                        hoverVert.position.copy(vertex.getPosition().add(PolyObject.selected.position));
                         scene.add(hoverVert);
                         customWireframe.push(hoverVert);
                     }
@@ -397,88 +366,140 @@ f.calculateCenter();
 }
 polyGeoMesh.geometry = pMesh.triangulate();
 } */
-        if (Input.mouse.getButton(MouseButton.Wheel)) {
-            if (Input.getKey("Shift")) {
-                rotVelocity.x = 0;
-                rotVelocity.z = 0;
-                cameraParent.translateX(-Input.mouse.delta.x * 0.01);
-                cameraParent.translateY(Input.mouse.delta.y * 0.01);
-            }
-            else {
-                rotVelocity.x = (Input.mouse.delta.x * 0.003);
-                rotVelocity.z = (Input.mouse.delta.y * 0.003);
-            }
-        }
-        else {
-            rotVelocity.x = lerp(rotVelocity.x, 0.00, 0.3);
-            rotVelocity.z = lerp(rotVelocity.z, 0.00, 0.3);
-        }
-        if (Input.mouse.getButtonUp(MouseButton.Right) && Editing.operation == null && editingMode == EditingModes.Object) {
-            let obj = new PolyObject();
-            if (groundIntersect) {
-                obj.position.copy(groundIntersect.point);
-            }
-            group.add(obj);
-        }
-        if (Input.getKeyUp("+")) {
-            editingMode = EditingModes.Vertex;
-        }
-        if (Input.getKeyUp("ě")) {
-            editingMode = EditingModes.Edge;
-        }
-        if (Input.getKeyUp("š")) {
-            editingMode = EditingModes.Face;
-        }
-        if (Input.getKeyUp("Tab")) {
-            editingMode = (editingMode == EditingModes.Object && PolyObject.selected != undefined) ? EditingModes.Face : EditingModes.Object;
-            if (editingMode == EditingModes.Object && PolyObject.selected) {
-                Editing.selection = [PolyObject.selected];
-            }
-            else {
-                Editing.selection = [];
-            }
-        }
-        if (Editing.selection.length > 0) {
-            if (Input.getKeyUp("g")) {
-                new MoveOperation(Editing.selection);
-            }
-            if (Input.getKeyUp("s")) {
-                new ScaleOperation(Editing.selection);
-            }
-            if (Input.getKeyUp("r")) {
-                new RotateOperation(Editing.selection);
-            }
-            if (Input.getKeyUp("Delete") || Input.getKeyUp("x") && Editing.operation == null) {
-                for (const obj of Editing.selection) {
-                    obj.destroy();
-                }
-            }
-            if (Editing.editMode == EditingModes.Face) {
-                if (Input.getKeyUp("e")) {
-                    if (Face.selected) {
-                        let newFace = Face.selected.extrude(0.01).top;
-                        Face.selected = newFace;
-                        Editing.selection = [newFace];
-                        let op = new MoveOperation(Editing.selection);
-                        op.axis = newFace.normal;
-                        op.axisLock = true;
+
+        if (UI.mouseOverUI == 0) {
+            if ((Input.mouse.getButtonUp(MouseButton.Left) || Input.mouse.getButtonUp(MouseButton.Right)) && !gizmoIntersect && Editing.operation == null) {
+                switch (editingMode) {
+                    case EditingModes.Object: {
+                        PolyObject.select(PolyObject.hovered);
+                        outlinePass.selectedObjects = PolyObject.selected ? [PolyObject.selected] : [];
+                        break;
+                    }
+                    case EditingModes.Vertex: {
+                        Vertex.selected = Vertex.hovered;
+                        if (Vertex.selected) {
+                            if (Input.getKey("Shift")) {
+                                Editing.selection.push(Vertex.selected);
+                            }
+                            else {
+                                Editing.selection = [Vertex.selected];
+                            }
+                        }
+                        else {
+                            Editing.selection = [];
+                        }
+                        break;
+                    }
+                    case EditingModes.Face: {
+                        Face.selected = Face.hovered;
+                        if (Face.selected) {
+                            if (Input.getKey("Shift")) {
+                                Editing.selection.push(Face.selected);
+                            }
+                            else {
+                                Editing.selection = [Face.selected];
+                            }
+                        }
+                        else {
+                            Editing.selection = [];
+                        }
+                        break;
                     }
                 }
-                if (Input.getKeyUp("i")) {
-                    if (Face.selected) {
-                        let newFace = Face.selected.extrude(0).top;
-                        Face.selected = newFace;
-                        Editing.selection = [newFace];
-                        let op = new ScaleOperation(Editing.selection);
-                    }
+
+            }
+            if (Input.mouse.getButton(MouseButton.Wheel)) {
+                if (Input.getKey("Shift")) {
+                    rotVelocity.x = 0;
+                    rotVelocity.z = 0;
+                    cameraParent.translateX(-Input.mouse.delta.x * 0.01);
+                    cameraParent.translateY(Input.mouse.delta.y * 0.01);
+                }
+                else {
+                    rotVelocity.x = (Input.mouse.delta.x * 0.003);
+                    rotVelocity.z = (Input.mouse.delta.y * 0.003);
                 }
             }
-            else if (Editing.editMode == EditingModes.Vertex) {
-                if (Input.getKeyUp("f") && PolyObject.selected) {
-                    if (Editing.selection.length >= 3) {
-                        Face.fromVertices(PolyObject.selected.polyMesh, Editing.selection as Vertex[]);
-                        PolyObject.selected.polyMesh.dirty = true;
-                        PolyObject.selected.recalculate();
+            else {
+                rotVelocity.x = lerp(rotVelocity.x, 0.00, 0.3);
+                rotVelocity.z = lerp(rotVelocity.z, 0.00, 0.3);
+            }
+            if (Input.mouse.getButtonUp(MouseButton.Right) && Editing.operation == null) {
+                const buttonArray = [];
+                if (Editing.editMode == EditingModes.Object) {
+                    buttonArray.push(new UIButton("Add Cube", () => objectToScene(PolyObject.cube(), groundIntersect?.point, group)));
+                    buttonArray.push(new UIButton("Add Circle", () => objectToScene(PolyObject.circle(), groundIntersect?.point, group)));
+                    buttonArray.push(new UIButton("Add Sphere", () => objectToScene(PolyObject.sphere(), groundIntersect?.point, group)));
+                }
+                if (Editing.selection.length > 0) {
+                    if (buttonArray.length > 0) buttonArray.push(new UIDivider());
+                    if (Editing.editMode == EditingModes.Object && PolyObject.selected) {
+                        let tempObj = PolyObject.selected;
+                        buttonArray.push(new UIButton("Shade Smooth", () => { tempObj.shadeSmooth = true; tempObj.recalculate(true); }));
+                        buttonArray.push(new UIButton("Shade Flat", () => { tempObj.shadeSmooth = false; tempObj.recalculate(true); }));
+                    }
+                    buttonArray.push(new UIButton("Remove", () => { removeSelectables(...Editing.selection) }));
+                }
+                const contextMenu = new UIContextMenu(...buttonArray);
+            }
+            if (Input.getKeyUp("+")) {
+                editingMode = EditingModes.Vertex;
+            }
+            if (Input.getKeyUp("ě")) {
+                editingMode = EditingModes.Edge;
+            }
+            if (Input.getKeyUp("š")) {
+                editingMode = EditingModes.Face;
+            }
+            if (Input.getKeyUp("Tab")) {
+                editingMode = (editingMode == EditingModes.Object && PolyObject.selected != undefined) ? EditingModes.Face : EditingModes.Object;
+                if (editingMode == EditingModes.Object && PolyObject.selected) {
+                    Editing.selection = [PolyObject.selected];
+                }
+                else {
+                    Editing.selection = [];
+                }
+            }
+            if (Editing.selection.length > 0) {
+                if (Input.getKeyUp("g")) {
+                    new MoveOperation(Editing.selection);
+                }
+                if (Input.getKeyUp("s")) {
+                    new ScaleOperation(Editing.selection);
+                }
+                if (Input.getKeyUp("r")) {
+                    new RotateOperation(Editing.selection);
+                }
+                if (Input.getKeyUp("Delete") || Input.getKeyUp("x") && Editing.operation == null) {
+                    removeSelectables(...Editing.selection);
+                }
+                if (Editing.editMode == EditingModes.Face) {
+                    if (Input.getKeyUp("e")) {
+                        if (Face.selected) {
+                            let newFace = Face.selected.extrude(0.01).top;
+                            Face.selected = newFace;
+                            Editing.selection = [newFace];
+                            let op = new MoveOperation(Editing.selection);
+                            op.axis = newFace.normal;
+                            op.axisLock = true;
+                        }
+                    }
+                    if (Input.getKeyUp("i")) {
+                        if (Face.selected) {
+                            let newFace = Face.selected.extrude(0).top;
+                            Face.selected = newFace;
+                            Editing.selection = [newFace];
+                            let op = new ScaleOperation(Editing.selection);
+                        }
+                    }
+                }
+                else if (Editing.editMode == EditingModes.Vertex) {
+                    if (Input.getKeyUp("f") && PolyObject.selected) {
+                        if (Editing.selection.length >= 3) {
+                            Face.fromVertices(PolyObject.selected.polyMesh, Editing.selection as Vertex[]);
+                            PolyObject.selected.polyMesh.dirty = true;
+                            PolyObject.selected.recalculate();
+                        }
                     }
                 }
             }
@@ -510,6 +531,70 @@ polyGeoMesh.geometry = pMesh.triangulate();
         Input.update();
         window.requestAnimationFrame(update);
     }
+}
+
+export function addObject(position = new Vector3(), parent: Object3D = SceneState.scene) {
+    let obj = PolyObject.cube();
+    parent.add(obj);
+    obj.position.copy(position);
+}
+
+export function objectToScene(object: Object3D, position = new Vector3(), parent: Object3D = SceneState.scene) {
+    parent.add(object);
+    object.position.copy(position);
+}
+
+export function removeSelectables(...selectables: Selectable[]) {
+    selectables.forEach(s => s.destroy());
+}
+
+export function saveScene() {
+    console.log("saveScene");
+    exporter.parseAsync(SceneState.objectGroup).then((result: any) => {
+
+        //result = processGLTF(result);
+        //DOESN'T PRODUCE VALID GLTF
+
+        console.log("Saving scene...");
+        const blob = new Blob([JSON.stringify(result)], { type: "model/gltf+json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "scene.gltf";
+        a.click();
+    }).catch((error) => {
+        console.error(error);
+    });
+}
+
+function processGLTF(result: any) {
+    const newNodes = [];
+    for (const node of result.nodes) {
+        if (Object.keys(node).length > 0 && node.children) {
+            if (node.children.length == 1 && !node.mesh && result.nodes[node.children[0]].mesh != undefined) {
+                node.mesh = result.nodes[node.children[0]].mesh;
+                node.children = [];
+                newNodes.push(node);
+            }
+            else if (node.children.length > 1) {
+                newNodes.push(node);
+            }
+        }
+    }
+    for (const newNode of newNodes) {
+        const newChildren = [];
+        for (const childIndex of newNode.children) {
+            const oldChild = result.nodes[childIndex];
+            const ind = newNodes.indexOf(oldChild);
+            if (ind != -1) {
+                newChildren.push(ind);
+            }
+        }
+        newNode.children = newChildren;
+    }
+    result.nodes = newNodes;
+    result.scenes[0].nodes = [result.nodes.length];
+    return result;
 }
 
 
