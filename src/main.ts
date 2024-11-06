@@ -140,7 +140,7 @@ async function init() {
     light4.position.set(2, 0, 3);
     scene.add(light4);
 
-    const obj = new PolyObject();
+    const obj = PolyObject.cube();
     group.add(obj);
     //group.add(wireframe);
 
