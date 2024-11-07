@@ -117,6 +117,8 @@ export class UIContextMenu extends UIPanel {
         }
 
         this.addChild(new UIButton("Save Scene",saveScene), new UIButton("Launch Revenant Earth",()=>{window.location.href = "https://mylapqn.github.io/revenant-earth/"}));
+        
+        this.addChild(new UIButton("Open Presentation",()=>{window.location.href = "https://www.canva.com/design/DAGSeJQGOy0/o6m0KIGwBaScX1zH0ojz_A/edit?utm_content=DAGSeJQGOy0&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton"}));
     }
     remove() {
         UIContextMenu.current = undefined;
