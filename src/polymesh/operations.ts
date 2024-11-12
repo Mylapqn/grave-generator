@@ -136,7 +136,7 @@ export class ScaleOperation extends AxisOperation {
         else {
             if (this.axisLock) {
                 this.currentPosition.copy(this.startPosition.clone().multiply(this.axis.clone().multiplyScalar((Input.mouse.position.distanceTo(this.startMousePosition) / this.startMouseDistance)).add(new Vector3(1, 1, 1).sub(this.axis))));
-                console.log(this.currentPosition);
+                //console.log(this.currentPosition);
             }
             else {
                 this.currentPosition.copy(this.startPosition.clone().multiplyScalar(Input.mouse.position.distanceTo(this.startMousePosition) / this.startMouseDistance));
@@ -180,7 +180,7 @@ export class RotateOperation extends AxisOperation {
                 let curQuat = new Quaternion().setFromEuler(this.startRotation).multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1).applyQuaternion(SceneState.camera.getWorldQuaternion(new Quaternion())), this.totalInput));
                 this.curRotation.setFromQuaternion(curQuat);
             }
-            console.log(Editing.selection[0]);
+            //console.log(Editing.selection[0]);
         }
         for (let i = 0; i < this.selection.length; i++) {
             this.selection[i].setRotation(this.currentState[i], this.curRotation.clone());

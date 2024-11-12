@@ -20,11 +20,13 @@ import outlineVertRaw from "./shader/outline.vert?raw";
 import { AxisOperation, MoveOperation, Operation, RotateOperation, ScaleOperation } from './polymesh/operations';
 import { UI, UIButton, UIContextMenu, UIDivider } from './ui';
 import { remove } from 'three/examples/jsm/libs/tween.module.js';
+import { PolyMeshObjImporter } from './polymesh/obj_ngon_importer';
 const outlineVert = outlineVertRaw.substring(outlineVertRaw.indexOf("//THREE HEADER END"));
 
 const renderer = new WebGLRenderer({ canvas: document.getElementById("app") as HTMLCanvasElement, alpha: true, antialias: true });
 export const defaultMaterial = new MeshStandardMaterial({ color: 0xDDDDDD, flatShading: false, side: DoubleSide });
 const exporter = new GLTFExporter();
+const importer = new PolyMeshObjImporter();
 export class SceneState {
     static scene: Scene;
     static objectGroup: Group;
@@ -616,6 +618,16 @@ function wireFace(face: Face, material: LineMaterial, offset: number): Line2 {
     wireFace.rotation.copy(face.mesh.polyObject.rotation);
     wireFace.scale.copy(face.mesh.polyObject.scale);
     return wireFace;
+}
+
+export async function importFile() {
+    const obj = await importer.import("./models/grave_head.obj");
+    if (obj != null) {
+        SceneState.objectGroup.add(obj);
+        PolyObject.select(obj);
+        Editing.editMode = EditingModes.Object;
+        Editing.selection = [obj];
+    }
 }
 
 /* function createText(content: string, font: Font, material: Material) {

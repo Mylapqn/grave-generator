@@ -1,6 +1,6 @@
 import { Vector2 } from "three";
 import { Input } from "./input";
-import { addObject, saveScene } from "./main";
+import { addObject, importFile, saveScene } from "./main";
 
 export class UI {
     static container: HTMLDivElement;
@@ -116,9 +116,14 @@ export class UIContextMenu extends UIPanel {
             this.addChild(new UIDivider());
         }
 
-        this.addChild(new UIButton("Save Scene",saveScene), new UIButton("Launch Revenant Earth",()=>{window.location.href = "https://mylapqn.github.io/revenant-earth/"}));
-        
-        this.addChild(new UIButton("Open Presentation",()=>{window.location.href = "https://www.canva.com/design/DAGSeJQGOy0/o6m0KIGwBaScX1zH0ojz_A/edit?utm_content=DAGSeJQGOy0&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton"}));
+        this.addChild(
+            new UIButton("Save Scene", saveScene),
+            new UIButton("Import File", importFile),
+            new UIButton("Launch Revenant Earth", () => { window.location.href = "https://mylapqn.github.io/revenant-earth/" })
+        );
+
+        this.addChild(new UIButton("Open Presentation", () => { window.location.href = "https://www.canva.com/design/DAGSeJQGOy0/o6m0KIGwBaScX1zH0ojz_A/edit?utm_content=DAGSeJQGOy0&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton" }));
+
     }
     remove() {
         UIContextMenu.current = undefined;
@@ -128,6 +133,6 @@ export class UIContextMenu extends UIPanel {
 
 export class UIDivider extends UIElement {
     constructor() {
-        super("div","divider");
+        super("div", "divider");
     }
 }
